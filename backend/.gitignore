@@ -1,0 +1,11 @@
+dockpanel-mcp
+dockpanel-mcp.exe
+dockpanel-server.exe
+dockpanel-server-v3.exe
+dockpanel-*-new.exe
+dockpanel-*-v*.exe
+dockpanel-*.exe~
+
+data/*
+!data/.gitkeep
+backups/

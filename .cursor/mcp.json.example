@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "dockpanel-vps": {
+      "command": "./backend/dockpanel-mcp.exe",
+      "env": {
+        "DOCKPANEL_HOSTS": "[{\"id\":\"vps\",\"label\":\"VPS\",\"dockerHost\":\"ssh://user@SEU_IP\"}]"
+      }
+    }
+  }
+}

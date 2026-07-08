@@ -1,0 +1,50 @@
+# Dependencies
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+
+# Go binaries (gere localmente com go build)
+backend/*.exe
+backend/*.exe~
+backend/dockpanel-mcp
+backend/dockpanel-server
+
+# Runtime data (métricas, alertas — podem expor nomes de containers/serviços)
+backend/data/*
+!backend/data/.gitkeep
+
+# Backups de volumes gerados em runtime
+backend/backups/
+dockpanel-backups/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+known_hosts
+
+# Config local do Cursor MCP (use mcp.json.example)
+.cursor/mcp.json
+
+# Docker overrides locais (costumam ter credenciais)
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

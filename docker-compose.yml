@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    container_name: dockpanel-backend
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # sem :ro — o socket precisa de leitura E escrita pra comandos
+      # como start/stop/remove funcionarem.
+    environment:
+      - PORT=8080
+
+  frontend:
+    build: ./frontend
+    container_name: dockpanel-frontend
+    restart: unless-stopped
+    ports:
+      - "9090:80"
+    depends_on:
+      - backend
