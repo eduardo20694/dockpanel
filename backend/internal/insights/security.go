@@ -67,7 +67,11 @@ func Audit(ctx context.Context, cli *client.Client, hostID, hostLabel string) (*
 		}
 		user := info.Config.User
 		if user == "" || user == "0" || user == "root" || strings.HasPrefix(user, "0:") {
-			add("warning", "root_user", fmt.Sprintf("roda como root (User=%q)", user))
+			detail := fmt.Sprintf("roda como root (User=%q)", user)
+			if user == "" {
+				detail = "User não definido — Docker executa como root por padrão"
+			}
+			add("warning", "root_user", detail)
 		}
 		if strings.HasSuffix(strings.ToLower(c.Image), ":latest") || !strings.Contains(c.Image, ":") {
 			report.LatestTagCount++

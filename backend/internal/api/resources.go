@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 
 	"dockpanel/internal/backup"
@@ -29,6 +30,9 @@ func (s *Server) listImages(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) scanImage(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if decoded, err := url.PathUnescape(id); err == nil {
+		id = decoded
+	}
 	report, err := scan.ScanImage(r.Context(), id)
 	if err != nil {
 		writeErr(w, err)
@@ -107,7 +111,7 @@ func (s *Server) backupVolume(w http.ResponseWriter, r *http.Request) {
 	if dest == "" {
 		dest = os.Getenv("DOCKPANEL_BACKUP_DIR")
 	}
-	res, err := backup.BackupVolume(r.Context(), name, dest)
+	res, err := backup.BackupVolume(r.Context(), name, dest, "")
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -123,7 +127,7 @@ func (s *Server) removeVolume(w http.ResponseWriter, r *http.Request) {
 	var backupResult any
 	if backupFirst {
 		dest := os.Getenv("DOCKPANEL_BACKUP_DIR")
-		res, err := backup.BackupVolume(r.Context(), name, dest)
+		res, err := backup.BackupVolume(r.Context(), name, dest, "")
 		if err != nil {
 			writeErr(w, err)
 			return

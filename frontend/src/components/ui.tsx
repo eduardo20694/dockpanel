@@ -113,7 +113,14 @@ export function SeverityBadge({ severity }: { severity: string }) {
     warning: 'badge-warning',
     ok: 'badge-ok',
   }
-  return <span className={map[severity] || 'badge-neutral'}>{severity}</span>
+  const labels: Record<string, string> = {
+    critical: 'critical',
+    warning: 'atenção',
+    ok: 'saudável',
+  }
+  const cls = map[severity] || 'badge-neutral'
+  const label = labels[severity] || severity
+  return <span className={cls}>{label}</span>
 }
 
 export function Btn({

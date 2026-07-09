@@ -5,6 +5,7 @@ import { useHost } from '../context/HostContext'
 import Sparkline from '../components/Sparkline'
 import { BackendError, LoadingState } from '../components/BackendState'
 import { PageShell, PageInner, SeverityBadge, Panel } from '../components/ui'
+import { formatInspectValue, securityBadgeClass, severityAlertClass, sparklineTone } from '../lib/format'
 import { usePoll } from '../lib/usePoll'
 
 export default function Investigate() {
@@ -45,6 +46,9 @@ export default function Investigate() {
   const d = report.diagnosis
   const cpuHist = (report.metricHistory || []).map((m: any) => m.cpuPct)
   const memHist = (report.metricHistory || []).map((m: any) => m.memPct)
+  const security = (report.security || []).filter((f: any) => f.severity !== 'info')
+  const secCritical = security.filter((f: any) => f.severity === 'critical').length
+  const secWarning = security.filter((f: any) => f.severity === 'warning').length
 
   return (
     <PageShell>
@@ -53,31 +57,59 @@ export default function Investigate() {
           ← Containers
         </Link>
 
-        <div className="flex items-start justify-between mb-6 pb-5 border-b border-border">
+        <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b border-border">
           <div>
             <h1 className="text-xl font-semibold">{d.name}</h1>
             <div className="text-sm text-text-muted font-mono mt-1 tabular-nums">
               {report.hostLabel} · {d.state} · exit {d.exitCode} · {d.restartCount} restarts
             </div>
           </div>
-          <SeverityBadge severity={d.severity} />
+          <div className="flex flex-wrap gap-2 justify-end">
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Operação</div>
+              <SeverityBadge severity={d.severity} />
+            </div>
+            {security.length > 0 && (
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Segurança</div>
+                <span className={secCritical > 0 ? 'badge-critical' : 'badge-warning'}>
+                  {secCritical > 0 ? `${secCritical} critical` : `${secWarning} aviso(s)`}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="alert-warning mb-6">
-          <div className="text-sm">{d.recommendation}</div>
+        <div className={`${severityAlertClass(d.severity)} mb-6`}>
+          <div className="text-sm font-medium">{d.recommendation}</div>
+          {d.severity === 'ok' && security.length > 0 && (
+            <div className="text-xs mt-2 opacity-90">
+              Container operando normalmente — os itens em Segurança abaixo são riscos de configuração, não falhas de runtime.
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-3 mb-5">
           <Panel title="CPU (24h)">
-            <Sparkline values={cpuHist} width={280} height={36} />
+            <Sparkline values={cpuHist} width={280} height={36} tone={sparklineTone(cpuHist)} />
+            {cpuHist.length > 0 && (
+              <div className="text-[11px] text-text-faint mt-2 tabular-nums">
+                pico {Math.max(...cpuHist).toFixed(1)}%
+              </div>
+            )}
           </Panel>
           <Panel title="Memória (24h)">
-            <Sparkline values={memHist} tone="danger" width={280} height={36} />
+            <Sparkline values={memHist} width={280} height={36} tone={sparklineTone(memHist)} />
+            {memHist.length > 0 && (
+              <div className="text-[11px] text-text-faint mt-2 tabular-nums">
+                pico {Math.max(...memHist).toFixed(1)}%
+              </div>
+            )}
           </Panel>
         </div>
 
         {d.findings?.length > 0 && (
-          <Panel title="Achados">
+          <Panel title="Achados operacionais">
             <ul className="space-y-1 text-sm text-text-muted">
               {d.findings.map((f: string, i: number) => (
                 <li key={i}>· {f}</li>
@@ -100,13 +132,23 @@ export default function Investigate() {
           </Panel>
         )}
 
-        {report.security?.length > 0 && (
+        {security.length > 0 && (
           <Panel title="Segurança">
-            <ul className="space-y-1 text-sm">
-              {report.security.map((f: any, i: number) => (
-                <li key={i} className="text-tone-danger">
-                  <span className="badge-warning text-[10px] mr-2">{f.category}</span>
-                  {f.detail}
+            <p className="text-xs text-text-muted mb-3">
+              Configuração e superfície de ataque — separado do diagnóstico operacional acima.
+            </p>
+            <ul className="space-y-2 text-sm">
+              {security.map((f: any, i: number) => (
+                <li
+                  key={i}
+                  className={`rounded-md border p-3 ${
+                    f.severity === 'critical'
+                      ? 'border-danger-border bg-danger-muted'
+                      : 'border-warning-border bg-warning-muted'
+                  }`}
+                >
+                  <span className={`${securityBadgeClass(f.severity)} text-[10px] mr-2`}>{f.category}</span>
+                  <span className="text-text-secondary">{f.detail}</span>
                 </li>
               ))}
             </ul>
@@ -128,7 +170,7 @@ export default function Investigate() {
             {Object.entries(report.inspect || {}).map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-text-faint">{k}</dt>
-                <dd className="truncate text-text-secondary">{fmt(v)}</dd>
+                <dd className="break-all text-text-secondary">{formatInspectValue(k, v)}</dd>
               </div>
             ))}
           </dl>
@@ -136,10 +178,4 @@ export default function Investigate() {
       </PageInner>
     </PageShell>
   )
-}
-
-function fmt(v: unknown): string {
-  if (v == null) return '—'
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
 }

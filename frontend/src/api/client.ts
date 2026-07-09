@@ -9,6 +9,7 @@ function hostHeaders(): Record<string, string> {
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...hostHeaders(), ...(opts.headers as object) },
     ...opts,
   })
@@ -33,6 +34,16 @@ function isAllHosts() {
 }
 
 export const api = {
+  auth: {
+    config: () => request<{ enabled: boolean }>('/auth/config'),
+    me: () => request<{ authEnabled: boolean; user: AuthUser | null }>('/auth/me'),
+    login: (email: string, password: string) =>
+      request<{ user: AuthUser }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }),
+    logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+  },
   hosts: {
     list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string }[] }>('/hosts'),
   },
@@ -99,12 +110,41 @@ export const api = {
       action?: string
       build?: boolean
       detach?: boolean
+      tail?: number
     }) =>
       request<any>('/deploy/compose', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     status: (path?: string) =>
-      request<any>(`/deploy/compose/status${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+      request<{ services: ServiceStatus[]; result: ComposeResult }>(
+        `/deploy/compose/status${path ? `?path=${encodeURIComponent(path)}` : ''}`,
+      ),
   },
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: string
+}
+
+export interface ServiceStatus {
+  name: string
+  service: string
+  state: string
+  status: string
+  ports: string
+  image: string
+  health?: string
+}
+
+export interface ComposeResult {
+  ok: boolean
+  action: string
+  path: string
+  composeFile: string
+  output: string
+  duration: string
 }

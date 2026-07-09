@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os/exec"
 	"strings"
 	"time"
@@ -47,7 +48,22 @@ func TrivyAvailable() bool {
 	return err == nil
 }
 
+func normalizeImageRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return ref
+	}
+	if decoded, err := url.PathUnescape(ref); err == nil {
+		ref = decoded
+	}
+	if decoded, err := url.QueryUnescape(ref); err == nil {
+		ref = decoded
+	}
+	return ref
+}
+
 func ScanImage(ctx context.Context, imageRef string) (*Report, error) {
+	imageRef = normalizeImageRef(imageRef)
 	if !TrivyAvailable() {
 		return &Report{
 			Image:   imageRef,
@@ -66,10 +82,13 @@ func ScanImage(ctx context.Context, imageRef string) (*Report, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("trivy falhou: %s", strings.TrimSpace(out.String()))
 	}
+	return parseTrivyJSON(imageRef, out.String())
+}
 
+func parseTrivyJSON(imageRef, output string) (*Report, error) {
 	var raw trivyJSON
-	if err := json.Unmarshal(out.Bytes(), &raw); err != nil {
-		return nil, err
+	if err := json.Unmarshal([]byte(output), &raw); err != nil {
+		return nil, fmt.Errorf("parse trivy json: %w", err)
 	}
 
 	report := &Report{Image: imageRef, Scanner: "trivy"}

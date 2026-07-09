@@ -9,8 +9,18 @@ import (
 )
 
 func (s *Server) deployPresets(w http.ResponseWriter, r *http.Request) {
+	hostID := s.resolveHostID(r)
+	dockerHost := deploy.DockerHostLabel()
+	for _, h := range s.Hosts.List() {
+		if h.ID == hostID {
+			if h.DockerHost != "" {
+				dockerHost = h.DockerHost
+			}
+			break
+		}
+	}
 	writeJSON(w, map[string]interface{}{
-		"dockerHost": deploy.DockerHostLabel(),
+		"dockerHost": dockerHost,
 		"presets":    deploy.Presets(),
 	})
 }
@@ -60,13 +70,21 @@ func (s *Server) deployComposeStatus(w http.ResponseWriter, r *http.Request) {
 			path = presets[0].ProjectPath
 		}
 	}
-	res, err := deploy.RunCompose(r.Context(), deploy.ComposeRequest{
-		ProjectPath: path,
-		Action:      "ps",
-	})
+	hostID := dockerclient.HostIDFromRequest(r.Header.Get("X-Dockpanel-Host"), r.URL.Query().Get("host"))
+	req := deploy.ComposeRequest{ProjectPath: path, Action: "ps"}
+	for _, h := range s.Hosts.List() {
+		if h.ID == hostID || (hostID == "" && h.ID == s.Hosts.DefaultID()) {
+			req.DockerHost = h.DockerHost
+			break
+		}
+	}
+	services, res, err := deploy.ListServices(r.Context(), req)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, res)
+	writeJSON(w, map[string]interface{}{
+		"services": services,
+		"result":   res,
+	})
 }

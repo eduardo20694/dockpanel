@@ -1,20 +1,36 @@
 services:
-  backend:
-    build: ./backend
-    container_name: dockpanel-backend
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # sem :ro — o socket precisa de leitura E escrita pra comandos
-      # como start/stop/remove funcionarem.
-    environment:
-      - PORT=8080
-
-  frontend:
-    build: ./frontend
-    container_name: dockpanel-frontend
+  dockpanel:
+    image: redecoop/dockpanel:${VERSION:-0.0.1}
+    container_name: dockpanel
     restart: unless-stopped
     ports:
-      - "9090:80"
-    depends_on:
-      - backend
+      - "8083:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockpanel-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PORT=8080
+      - DOCKPANEL_DATA_DIR=/data
+      - DOCKPANEL_HOSTS=${DOCKPANEL_HOSTS}
+      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-dockpanel}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
+      - DOCKPANEL_JWT_SECRET=${DOCKPANEL_JWT_SECRET}
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.5
+    networks:
+      - default
+
+networks:
+  default:
+    name: bridge
+    external: true
+
+volumes:
+  dockpanel-data:

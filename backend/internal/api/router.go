@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"dockpanel/internal/auth"
 	"dockpanel/internal/dockerclient"
 	"dockpanel/internal/store"
 
@@ -15,11 +16,12 @@ import (
 type Server struct {
 	Hosts  *dockerclient.Pool
 	Store  *store.Store
+	Auth   *auth.Service
 	Router *chi.Mux
 }
 
-func NewServer(hosts *dockerclient.Pool, st *store.Store) *Server {
-	s := &Server{Hosts: hosts, Store: st, Router: chi.NewRouter()}
+func NewServer(hosts *dockerclient.Pool, st *store.Store, authSvc *auth.Service) *Server {
+	s := &Server{Hosts: hosts, Store: st, Auth: authSvc, Router: chi.NewRouter()}
 	s.routes()
 	return s
 }
@@ -29,15 +31,21 @@ func (s *Server) routes() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:9090"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Dockpanel-Host"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 	}))
+	r.Use(s.authMiddleware)
 
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
+
+	r.Get("/api/auth/config", s.authConfig)
+	r.Post("/api/auth/login", s.authLogin)
+	r.Post("/api/auth/logout", s.authLogout)
+	r.Get("/api/auth/me", s.authMe)
 
 	r.Get("/api/hosts", s.listHosts)
 

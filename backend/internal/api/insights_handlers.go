@@ -189,7 +189,7 @@ func filterSecurity(ctx context.Context, cli *client.Client, hostID, hostLabel, 
 	}
 	var out []insights.Finding
 	for _, f := range rep.Findings {
-		if f.ContainerID == containerID {
+		if f.ContainerID == containerID && f.Severity != "info" {
 			out = append(out, f)
 		}
 	}

@@ -1,0 +1,13 @@
+.git
+.cursor
+.env
+.env.*
+!.env.example
+!.env.vps.example
+backend/data
+backend/*.exe
+backend/backups
+frontend/node_modules
+frontend/dist
+**/*.md
+agent-transcripts

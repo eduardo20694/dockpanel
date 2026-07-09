@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"dockpanel/internal/backup"
+	"dockpanel/internal/deploy"
 	"dockpanel/internal/diagnostics"
 	"dockpanel/internal/drift"
 	"dockpanel/internal/dockerclient"
@@ -35,14 +36,14 @@ func registerListHosts(s *server.MCPServer, pool *dockerclient.Pool) {
 
 func registerComposeDrift(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("check_compose_drift",
-		mcp.WithDescription("Compara docker-compose.yml com containers rodando — detecta imagem divergente ou serviço ausente."),
-		mcp.WithString("project_path", mcp.Required(), mcp.Description("pasta do compose")),
+		mcp.WithDescription("Compara docker-compose.yml local com containers no host remoto — detecta drift."),
+		mcp.WithString("project_path", mcp.Description("pasta local do compose (padrão: DOCKPANEL_COMPOSE_PATH)")),
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		path, err := req.RequireString("project_path")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+		path := strings.TrimSpace(req.GetString("project_path", ""))
+		if path == "" {
+			path = deploy.ResolveComposePath("", "")
 		}
 		dc, err := pool.Get(req.GetString("host_id", pool.DefaultID()))
 		if err != nil {
@@ -68,15 +69,16 @@ func registerComposeDrift(s *server.MCPServer, pool *dockerclient.Pool) {
 
 func registerScanImage(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("scan_image_vulnerabilities",
-		mcp.WithDescription("Escaneia CVEs numa imagem com Trivy (precisa trivy no PATH)."),
-		mcp.WithString("image", mcp.Required(), mcp.Description("ref da imagem ex: nginx:1.25")),
+		mcp.WithDescription("Escaneia CVEs com Trivy local (imagem precisa existir no daemon do host_id ou local)."),
+		mcp.WithString("image", mcp.Required(), mcp.Description("ref da imagem ex: redecoop/dockpanel:0.0.1")),
+		mcp.WithString("host_id", mcp.Description("id do host — Trivy roda localmente; imagem deve estar pullada")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		image, err := req.RequireString("image")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		_ = pool
+		_ = hostIDFrom(req, pool)
 		report, err := scan.ScanImage(ctx, image)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -95,16 +97,18 @@ func registerScanImage(s *server.MCPServer, pool *dockerclient.Pool) {
 
 func registerBackupVolume(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("backup_volume",
-		mcp.WithDescription("Cria tarball de backup de um volume Docker antes de remover."),
+		mcp.WithDescription("Cria tarball de backup de um volume Docker no host configurado."),
 		mcp.WithString("volume", mcp.Required(), mcp.Description("nome do volume")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		name, err := req.RequireString("volume")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		_ = pool
-		res, err := backup.BackupVolume(ctx, name, "")
+		hostID := hostIDFrom(req, pool)
+		dockerHost := dockerHostFor(pool, hostID)
+		res, err := backup.BackupVolume(ctx, name, "", dockerHost)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -276,8 +280,8 @@ func registerSecurityAuditTool(s *server.MCPServer, pool *dockerclient.Pool) {
 
 func registerDeepDriftTool(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("deep_compose_drift",
-		mcp.WithDescription("Drift profundo: imagem, env, portas e containers órfãos vs docker-compose.yml."),
-		mcp.WithString("project_path", mcp.Required(), mcp.Description("pasta do compose")),
+		mcp.WithDescription("Drift profundo: compose local vs containers no host remoto."),
+		mcp.WithString("project_path", mcp.Description("pasta local do compose (padrão: DOCKPANEL_COMPOSE_PATH)")),
 		mcp.WithString("host_id", mcp.Description("id do host")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -285,9 +289,9 @@ func registerDeepDriftTool(s *server.MCPServer, pool *dockerclient.Pool) {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		path, err := req.RequireString("project_path")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+		path := strings.TrimSpace(req.GetString("project_path", ""))
+		if path == "" {
+			path = deploy.ResolveComposePath("", "")
 		}
 		report, err := drift.DeepCheck(ctx, dc.CLI, path)
 		if err != nil {

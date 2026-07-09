@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +27,17 @@ type ComposeRequest struct {
 	Build       bool   `json:"build"`
 	Detach      bool   `json:"detach"`
 	DockerHost  string `json:"dockerHost"`
+	Tail        int    `json:"tail"` // logs: linhas (padrão 100)
+}
+
+type ServiceStatus struct {
+	Name    string `json:"name"`
+	Service string `json:"service"`
+	State   string `json:"state"`
+	Status  string `json:"status"`
+	Ports   string `json:"ports"`
+	Image   string `json:"image"`
+	Health  string `json:"health,omitempty"`
 }
 
 type ComposeResult struct {
@@ -56,7 +68,7 @@ func Presets() []Preset {
 	}
 	return []Preset{{
 		ID:          "dockpanel",
-		Name:        "dockpanel (backend + frontend)",
+		Name:        "dockpanel",
 		ProjectPath: path,
 		ComposeFile: compose,
 	}}
@@ -73,6 +85,11 @@ func findComposeFile(dir string) (string, error) {
 }
 
 func RunCompose(ctx context.Context, req ComposeRequest) (*ComposeResult, error) {
+	if IsSSHHost(req.DockerHost) {
+		remotePath := ResolveComposePath(req.DockerHost, req.ProjectPath)
+		return runComposeSSH(ctx, req.DockerHost, remotePath, req)
+	}
+
 	if req.ProjectPath == "" {
 		return nil, fmt.Errorf("informe projectPath (pasta com docker-compose.yml)")
 	}
@@ -118,8 +135,17 @@ func RunCompose(ctx context.Context, req ComposeRequest) (*ComposeResult, error)
 		args = append(args, "ps")
 	case "pull":
 		args = append(args, "pull")
+	case "restart":
+		args = append(args, "restart")
+	case "logs":
+		args = append(args, "logs", "--no-color")
+		tail := req.Tail
+		if tail <= 0 {
+			tail = 100
+		}
+		args = append(args, "--tail", fmt.Sprintf("%d", tail))
 	default:
-		return nil, fmt.Errorf("ação inválida %q — use up, down, build, ps ou pull", action)
+		return nil, fmt.Errorf("ação inválida %q — use up, down, build, ps, pull, restart ou logs", action)
 	}
 
 	if ctx == nil {
@@ -172,4 +198,99 @@ func DockerHostLabel() string {
 		return "local (socket/pipe padrão)"
 	}
 	return host
+}
+
+type psJSONRow struct {
+	Name    string `json:"Name"`
+	Service string `json:"Service"`
+	State   string `json:"State"`
+	Status  string `json:"Status"`
+	Ports   string `json:"Ports"`
+	Image   string `json:"Image"`
+	Health  string `json:"Health"`
+}
+
+// ListServices roda `docker compose ps --format json` e devolve linhas parseadas.
+func ListServices(ctx context.Context, req ComposeRequest) ([]ServiceStatus, *ComposeResult, error) {
+	if req.ProjectPath == "" {
+		return nil, nil, fmt.Errorf("informe projectPath")
+	}
+	path, err := filepath.Abs(req.ProjectPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	composeName, err := findComposeFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	start := time.Now()
+	args := []string{"compose", "-f", filepath.Join(path, composeName), "ps", "--format", "json"}
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Dir = path
+	env := os.Environ()
+	if req.DockerHost != "" {
+		env = append(env, "DOCKER_HOST="+req.DockerHost)
+	}
+	cmd.Env = env
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	runErr := cmd.Run()
+	output := strings.TrimSpace(out.String())
+
+	res := &ComposeResult{
+		OK:       runErr == nil,
+		Action:   "ps",
+		Path:     path,
+		Compose:  composeName,
+		Output:   output,
+		Duration: time.Since(start).Round(time.Millisecond).String(),
+	}
+	services, parseErr := ParsePSJSON(output)
+	if parseErr != nil && output != "" {
+		res.Output = output + "\n(parse: " + parseErr.Error() + ")"
+	}
+	if runErr != nil {
+		if res.Output == "" {
+			res.Output = runErr.Error()
+		}
+		return services, res, fmt.Errorf("docker compose ps falhou: %s", res.Output)
+	}
+	return services, res, nil
+}
+
+func ParsePSJSON(output string) ([]ServiceStatus, error) {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return nil, nil
+	}
+	var services []ServiceStatus
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var row psJSONRow
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return nil, fmt.Errorf("linha ps inválida: %w", err)
+		}
+		services = append(services, ServiceStatus{
+			Name:    row.Name,
+			Service: row.Service,
+			State:   row.State,
+			Status:  row.Status,
+			Ports:   row.Ports,
+			Image:   row.Image,
+			Health:  row.Health,
+		})
+	}
+	return services, nil
 }

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"dockpanel/internal/deploy"
 )
 
 type Result struct {
@@ -17,9 +19,12 @@ type Result struct {
 	Duration   string `json:"duration"`
 }
 
-func BackupVolume(ctx context.Context, volumeName, destDir string) (*Result, error) {
+func BackupVolume(ctx context.Context, volumeName, destDir, dockerHost string) (*Result, error) {
 	if volumeName == "" {
 		return nil, fmt.Errorf("nome do volume vazio")
+	}
+	if deploy.IsSSHHost(dockerHost) {
+		return backupVolumeSSH(ctx, dockerHost, volumeName)
 	}
 	if destDir == "" {
 		destDir = filepath.Join(os.TempDir(), "dockpanel-backups")
@@ -34,7 +39,6 @@ func BackupVolume(ctx context.Context, volumeName, destDir string) (*Result, err
 	outPath := filepath.Join(destDir, fileName)
 
 	start := time.Now()
-	// alpine cria tarball do conteúdo do volume antes de remover
 	args := []string{
 		"run", "--rm",
 		"-v", volumeName + ":/volume:ro",
@@ -43,7 +47,7 @@ func BackupVolume(ctx context.Context, volumeName, destDir string) (*Result, err
 		"sh", "-c", "tar czf /backup/" + fileName + " -C /volume .",
 	}
 	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Env = os.Environ()
+	cmd.Env = dockerEnv(dockerHost)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("backup falhou: %s — %s", err, strings.TrimSpace(string(out)))
@@ -61,4 +65,37 @@ func BackupVolume(ctx context.Context, volumeName, destDir string) (*Result, err
 		SizeBytes:  size,
 		Duration:   time.Since(start).Round(time.Millisecond).String(),
 	}, nil
+}
+
+func backupVolumeSSH(ctx context.Context, dockerHost, volumeName string) (*Result, error) {
+	destDir := "/root/dockpanel-backups"
+	ts := time.Now().Format("20060102-150405")
+	safeName := strings.ReplaceAll(volumeName, "/", "_")
+	fileName := fmt.Sprintf("%s-%s.tar.gz", safeName, ts)
+	remotePath := destDir + "/" + fileName
+
+	start := time.Now()
+	script := fmt.Sprintf(
+		"mkdir -p %s && docker run --rm -v %s:/volume:ro -v %s:/backup alpine:3.20 sh -c 'tar czf /backup/%s -C /volume .'",
+		destDir, volumeName, destDir, fileName,
+	)
+	cmd := exec.CommandContext(ctx, "ssh", strings.TrimPrefix(dockerHost, "ssh://"), script)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("backup remoto falhou: %s — %s", err, strings.TrimSpace(string(out)))
+	}
+
+	return &Result{
+		VolumeName: volumeName,
+		BackupPath: remotePath + " (na VPS)",
+		Duration:   time.Since(start).Round(time.Millisecond).String(),
+	}, nil
+}
+
+func dockerEnv(dockerHost string) []string {
+	env := os.Environ()
+	if dockerHost != "" {
+		env = append(env, "DOCKER_HOST="+dockerHost)
+	}
+	return env
 }

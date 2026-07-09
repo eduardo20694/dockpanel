@@ -10,7 +10,6 @@ import (
 	"log"
 	"strings"
 
-	"dockpanel/internal/diagnostics"
 	"dockpanel/internal/deploy"
 	"dockpanel/internal/dockerclient"
 
@@ -28,23 +27,36 @@ func main() {
 	if err != nil {
 		log.Fatalf("erro ao conectar no Docker: %v", err)
 	}
-	dc, err := pool.Get(pool.DefaultID())
-	if err != nil {
-		log.Fatalf("host default: %v", err)
+
+	ctx := context.Background()
+	for _, h := range pool.List() {
+		dc, err := pool.Get(h.ID)
+		if err != nil {
+			log.Printf("mcp host %q: %v", h.ID, err)
+			continue
+		}
+		host := h.DockerHost
+		if host == "" {
+			host = "socket local"
+		}
+		if err := dc.Ping(ctx); err != nil {
+			log.Printf("mcp host %q (%s) offline: %v", h.ID, h.Label, err)
+		} else {
+			log.Printf("mcp host %q ok: %s → %s", h.ID, h.Label, host)
+		}
 	}
-	eng := diagnostics.New(dc.CLI)
 
 	s := server.NewMCPServer("dockpanel", "0.1.0")
 
-	registerListContainers(s, dc)
-	registerContainerAction(s, dc)
-	registerContainerLogs(s, dc)
-	registerDiagnoseContainer(s, eng)
-	registerScanProblems(s, eng)
-	registerSafePrune(s, dc)
-	registerRemoveResource(s, dc)
-	registerSystemOverview(s, dc)
-	registerDeployCompose(s)
+	registerListContainers(s, pool)
+	registerContainerAction(s, pool)
+	registerContainerLogs(s, pool)
+	registerDiagnoseContainer(s, pool)
+	registerScanProblems(s, pool)
+	registerSafePrune(s, pool)
+	registerRemoveResource(s, pool)
+	registerSystemOverview(s, pool)
+	registerDeployCompose(s, pool)
 	registerListHosts(s, pool)
 	registerComposeDrift(s, pool)
 	registerScanImage(s, pool)
@@ -62,11 +74,16 @@ func main() {
 
 // ---------- list_containers ----------
 
-func registerListContainers(s *server.MCPServer, dc *dockerclient.Client) {
+func registerListContainers(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("list_containers",
-		mcp.WithDescription("Lista todos os containers Docker do host local, rodando ou parados, com nome, imagem, estado e portas."),
+		mcp.WithDescription("Lista containers Docker do host configurado (use host_id; padrão: DOCKPANEL_HOSTS)."),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		list, err := dc.CLI.ContainerList(ctx, dockerContainer.ListOptions{All: true})
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -89,13 +106,18 @@ func registerListContainers(s *server.MCPServer, dc *dockerclient.Client) {
 
 // ---------- container_action (start/stop/restart) ----------
 
-func registerContainerAction(s *server.MCPServer, dc *dockerclient.Client) {
+func registerContainerAction(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("container_action",
-		mcp.WithDescription("Inicia, para ou reinicia um container pelo ID ou nome. Use com cuidado em ambientes de produção."),
+		mcp.WithDescription("Inicia, para ou reinicia um container pelo ID ou nome no host remoto/local."),
 		mcp.WithString("container", mcp.Required(), mcp.Description("ID ou nome do container")),
 		mcp.WithString("action", mcp.Required(), mcp.Description("uma de: start, stop, restart")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		id, err := req.RequireString("container")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -124,13 +146,18 @@ func registerContainerAction(s *server.MCPServer, dc *dockerclient.Client) {
 
 // ---------- container_logs ----------
 
-func registerContainerLogs(s *server.MCPServer, dc *dockerclient.Client) {
+func registerContainerLogs(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("container_logs",
-		mcp.WithDescription("Retorna as últimas linhas de log de um container. Útil pra investigar comportamento recente."),
+		mcp.WithDescription("Retorna as últimas linhas de log de um container no host configurado."),
 		mcp.WithString("container", mcp.Required(), mcp.Description("ID ou nome do container")),
 		mcp.WithString("tail", mcp.Description("quantas linhas do final trazer (padrão 100)")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		id, err := req.RequireString("container")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -170,12 +197,17 @@ func cleanControlBytes(s string) string {
 
 // ---------- diagnose_container (o principal) ----------
 
-func registerDiagnoseContainer(s *server.MCPServer, eng *diagnostics.Engine) {
+func registerDiagnoseContainer(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("diagnose_container",
-		mcp.WithDescription("Investiga um container específico: cruza exit code, OOM, contagem de restart, eventos recentes do Docker e linhas de log que batem em padrões de erro conhecidos. Use isso antes de tentar explicar por que um container está com problema."),
+		mcp.WithDescription("Investiga um container: exit code, OOM, restarts, eventos e logs com padrão de erro."),
 		mcp.WithString("container", mcp.Required(), mcp.Description("ID ou nome do container")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		eng, _, err := diagnosticsFor(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		id, err := req.RequireString("container")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -216,11 +248,16 @@ func registerDiagnoseContainer(s *server.MCPServer, eng *diagnostics.Engine) {
 
 // ---------- scan_problems ----------
 
-func registerScanProblems(s *server.MCPServer, eng *diagnostics.Engine) {
+func registerScanProblems(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("scan_problems",
-		mcp.WithDescription("Varre todos os containers do host e devolve só os que têm algum problema (crash loop, OOM, exit code de erro, restarting). Use isso pra ter uma visão geral de saúde antes de investigar um container específico."),
+		mcp.WithDescription("Varre containers do host e devolve os com problema (crash loop, OOM, exit code, restarting)."),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		eng, _, err := diagnosticsFor(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		problems, err := eng.ScanProblems(ctx)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -239,11 +276,16 @@ func registerScanProblems(s *server.MCPServer, eng *diagnostics.Engine) {
 
 // ---------- safe_prune_report ----------
 
-func registerSafePrune(s *server.MCPServer, dc *dockerclient.Client) {
+func registerSafePrune(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("safe_prune_report",
-		mcp.WithDescription("Lista imagens dangling, volumes não usados e containers parados que PODERIAM ser removidos pra liberar espaço — sem remover nada. Sempre mostre esse relatório pro usuário e peça confirmação explícita antes de chamar remove_resource."),
+		mcp.WithDescription("Lista imagens dangling, volumes e containers parados que poderiam ser removidos — sem remover."),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		var sb strings.Builder
 		var total int64
 
@@ -293,13 +335,18 @@ func registerSafePrune(s *server.MCPServer, dc *dockerclient.Client) {
 
 // ---------- remove_resource ----------
 
-func registerRemoveResource(s *server.MCPServer, dc *dockerclient.Client) {
+func registerRemoveResource(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("remove_resource",
-		mcp.WithDescription("Remove um recurso Docker (container, imagem ou volume) pelo ID/nome. AÇÃO DESTRUTIVA — só chame depois que o usuário confirmar explicitamente, de preferência depois de mostrar o safe_prune_report."),
+		mcp.WithDescription("Remove container, imagem ou volume no host configurado. AÇÃO DESTRUTIVA."),
 		mcp.WithString("kind", mcp.Required(), mcp.Description("um de: container, image, volume")),
 		mcp.WithString("id", mcp.Required(), mcp.Description("ID ou nome do recurso")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		kind, err := req.RequireString("kind")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -328,11 +375,16 @@ func registerRemoveResource(s *server.MCPServer, dc *dockerclient.Client) {
 
 // ---------- system_overview ----------
 
-func registerSystemOverview(s *server.MCPServer, dc *dockerclient.Client) {
+func registerSystemOverview(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("system_overview",
-		mcp.WithDescription("Visão geral do host Docker: versão, SO, CPUs, memória, total de containers/imagens."),
+		mcp.WithDescription("Visão geral do host Docker: versão, SO, CPUs, memória, containers/imagens."),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dc, err := hostClient(pool, hostIDFrom(req, pool))
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		info, err := dc.CLI.Info(ctx)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -349,19 +401,20 @@ func registerSystemOverview(s *server.MCPServer, dc *dockerclient.Client) {
 
 // ---------- deploy_compose ----------
 
-func registerDeployCompose(s *server.MCPServer) {
+func registerDeployCompose(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("deploy_compose",
-		mcp.WithDescription("Executa docker compose no host configurado (DOCKER_HOST). Use para buildar imagens e subir/derrubar stacks. Ações: up (sobe, com --build -d por padrão), down, build, ps, pull. Com DOCKER_HOST=ssh://user@host, deploya no servidor remoto."),
-		mcp.WithString("project_path", mcp.Required(), mcp.Description("pasta que contém docker-compose.yml (ex: c:\\Github\\dockpanel ou /root/dockpanel na VPS)")),
+		mcp.WithDescription("Executa docker compose no host remoto via SSH ou local. Deploy na VPS usa DOCKPANEL_COMPOSE_PATH_REMOTE (/root/dockpanel). Drift usa compose local."),
+		mcp.WithString("project_path", mcp.Description("pasta com docker-compose.yml (padrão: DOCKPANEL_COMPOSE_PATH)")),
+		mcp.WithString("host_id", mcp.Description("id do host (list_hosts); padrão: primeiro do DOCKPANEL_HOSTS")),
 		mcp.WithString("action", mcp.Description("up, down, build, ps ou pull (padrão: up)")),
 		mcp.WithString("build", mcp.Description("true/false — incluir --build no up (padrão true para up)")),
 		mcp.WithString("detach", mcp.Description("true/false — incluir -d no up (padrão true para up)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		path, err := req.RequireString("project_path")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
+		hostID := req.GetString("host_id", pool.DefaultID())
+		dockerHost := dockerHostFor(pool, hostID)
+		path := strings.TrimSpace(req.GetString("project_path", ""))
+		path = deploy.ResolveComposePath(dockerHost, path)
 		action := req.GetString("action", "up")
 		build := req.GetString("build", "true") == "true"
 		detach := req.GetString("detach", "true") == "true"
@@ -371,6 +424,7 @@ func registerDeployCompose(s *server.MCPServer) {
 			Action:      action,
 			Build:       build,
 			Detach:      detach,
+			DockerHost:  dockerHost,
 		})
 		if err != nil {
 			msg := err.Error()
@@ -380,8 +434,26 @@ func registerDeployCompose(s *server.MCPServer) {
 			return mcp.NewToolResultError(msg), nil
 		}
 
+		hostLabel := dockerHost
+		if hostLabel == "" {
+			hostLabel = deploy.DockerHostLabel()
+		} else {
+			hostLabel = "DOCKER_HOST=" + hostLabel
+		}
 		text := fmt.Sprintf("ok: compose %s em %s (%s) em %s\nHost Docker: %s\n\n%s",
-			res.Action, res.Path, res.Compose, res.Duration, deploy.DockerHostLabel(), res.Output)
+			res.Action, res.Path, res.Compose, res.Duration, hostLabel, res.Output)
 		return mcp.NewToolResultText(text), nil
 	})
+}
+
+func dockerHostFor(pool *dockerclient.Pool, hostID string) string {
+	if hostID == "" {
+		hostID = pool.DefaultID()
+	}
+	for _, h := range pool.List() {
+		if h.ID == hostID {
+			return h.DockerHost
+		}
+	}
+	return ""
 }

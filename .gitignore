@@ -12,7 +12,9 @@ backend/*.exe~
 backend/dockpanel-mcp
 backend/dockpanel-server
 
-# Runtime data (métricas, alertas — podem expor nomes de containers/serviços)
+# Runtime data (métricas locais em dev)
+data/*
+!data/.gitkeep
 backend/data/*
 !backend/data/.gitkeep
 
@@ -23,7 +25,9 @@ dockpanel-backups/
 # Variáveis de ambiente / segredos
 .env
 .env.*
+produção.env
 !.env.example
+!.env.vps.example
 *.pem
 *.key
 id_rsa
