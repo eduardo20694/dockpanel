@@ -45,7 +45,7 @@ export default function Login() {
           </div>
           <div>
             <h1 className="login-title">Dockwatch</h1>
-            <p className="login-tagline">Painel Docker</p>
+            <p className="login-tagline">Operações Docker self-hosted</p>
           </div>
         </div>
 

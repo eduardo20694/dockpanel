@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useHost } from '../context/HostContext'
+import { useNav } from '../context/NavContext'
 
 const groups = [
   {
-    label: 'Overview',
+    label: 'Visão geral',
     items: [
-      { to: '/', label: 'Overview', icon: ChartIcon },
+      { to: '/', label: 'Painel', icon: ChartIcon },
       { to: '/problems', label: 'Erros', icon: AlertIcon },
       { to: '/stacks', label: 'Stacks', icon: StackIcon },
       { to: '/security', label: 'Segurança', icon: ShieldIcon },
@@ -20,7 +21,7 @@ const groups = [
       { to: '/images', label: 'Imagens', icon: ImageIcon },
       { to: '/volumes', label: 'Volumes', icon: DiskIcon },
       { to: '/networks', label: 'Redes', icon: NetworkIcon },
-      { to: '/cleanup', label: 'Cleanup', icon: TrashIcon },
+      { to: '/cleanup', label: 'Limpeza', icon: TrashIcon },
     ],
   },
   {
@@ -33,22 +34,31 @@ const groups = [
 
 export default function Sidebar() {
   const { hostLabel } = useHost()
+  const { open, close } = useNav()
   const location = useLocation()
 
   function isActive(to: string) {
     return to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
   }
 
-  return (
-    <aside className="w-[240px] shrink-0 flex flex-col border-r border-border bg-surface backdrop-blur-xl">
-      <div className="h-14 flex items-center px-5 border-b border-border">
-        <div className="flex items-center gap-3">
-          <img src="/favicon.svg" alt="" className="w-8 h-8 rounded-lg" width={32} height={32} />
-          <div>
+  const panel = (
+    <>
+      <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <img src="/favicon.svg" alt="" className="w-8 h-8 rounded-lg shrink-0" width={32} height={32} />
+          <div className="min-w-0">
             <div className="font-display font-bold text-[15px] tracking-tight text-text">Dockwatch</div>
-            <div className="text-[10px] text-text-faint font-medium tracking-wide">DOCKER WATCH</div>
+            <div className="text-[10px] text-text-faint font-medium tracking-wide">DOCKER OPS</div>
           </div>
         </div>
+        <button
+          type="button"
+          className="lg:hidden btn-outline btn-sm p-2"
+          onClick={close}
+          aria-label="Fechar menu"
+        >
+          <CloseIcon />
+        </button>
       </div>
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto space-y-6">
@@ -66,6 +76,7 @@ export default function Sidebar() {
                     key={it.to}
                     to={it.to}
                     end={it.to === '/'}
+                    onClick={close}
                     className={`nav-item focus-ring ${active ? 'nav-item-active' : 'nav-item-inactive'}`}
                   >
                     {active && (
@@ -81,7 +92,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border shrink-0">
         <div className="rounded-xl p-3.5 bg-gradient-brand-subtle ring-1 ring-accent-border">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="live-dot w-2 h-2" />
@@ -91,12 +102,51 @@ export default function Sidebar() {
           <div className="text-[11px] text-text-muted mt-0.5">Dockwatch</div>
         </div>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop */}
+      <aside className="hidden lg:flex w-[240px] shrink-0 flex-col border-r border-border bg-surface backdrop-blur-xl h-full">
+        {panel}
+      </aside>
+
+      {/* Mobile drawer */}
+      <div
+        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-200 ${
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!open}
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={close}
+          aria-label="Fechar menu"
+        />
+        <aside
+          className={`absolute inset-y-0 left-0 w-[min(280px,88vw)] flex flex-col border-r border-border bg-surface shadow-elevated transition-transform duration-200 ${
+            open ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {panel}
+        </aside>
+      </div>
+    </>
   )
 }
 
 function iconCls(active: boolean) {
   return `w-[18px] h-[18px] shrink-0 ${active ? 'nav-icon-active' : 'nav-icon-inactive'}`
+}
+
+function CloseIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 function ChartIcon({ active }: { active: boolean }) {

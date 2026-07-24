@@ -67,12 +67,12 @@ export default function Dashboard() {
                 {hostLabel}
               </h1>
               <p className="text-text-muted text-[15px] max-w-lg">
-                Painel de controle Docker com diagnóstico inteligente, auditoria de segurança e visão por stack.
+                Painel Docker self-hosted: diagnóstico, segurança, stacks e deploy no mesmo host.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 shrink-0">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-text-faint mb-1">Health score</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-text-faint mb-1">Saúde</div>
                 <div className={`font-display font-bold text-5xl tabular-nums tracking-tight leading-none ${
                   healthScore >= 80 ? 'text-tone-success' : healthScore >= 50 ? 'text-tone-warning' : 'text-tone-danger'
                 }`}>
@@ -81,11 +81,11 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-3">
                 <div className="px-4 py-2.5 rounded-lg stat-box min-w-[72px]">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">Critical</div>
+                  <div className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">Crítico</div>
                   <div className="text-xl font-display font-bold text-tone-danger tabular-nums">{critical}</div>
                 </div>
                 <div className="px-4 py-2.5 rounded-lg stat-box min-w-[72px]">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">Warning</div>
+                  <div className="text-[10px] uppercase tracking-wider text-text-muted mb-0.5">Aviso</div>
                   <div className="text-xl font-display font-bold text-tone-warning tabular-nums">{warning}</div>
                 </div>
               </div>
@@ -120,19 +120,19 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="alert-success mb-6">
-            <div className="font-medium">Todos os sistemas operacionais — nenhum alerta critical.</div>
+            <div className="font-medium">Infraestrutura saudável — nenhum alerta crítico.</div>
           </div>
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <MetricCard
-            label="Critical"
+            label="Crítico"
             value={critical}
             tone="danger"
             icon={<IconAlert />}
           />
           <MetricCard
-            label="Warning"
+            label="Aviso"
             value={warning}
             tone="warning"
             icon={<IconWarn />}
@@ -148,7 +148,7 @@ export default function Dashboard() {
             label="Segurança"
             value={data?.securityCritical ?? 0}
             tone="danger"
-            sub="riscos critical"
+            sub="riscos críticos"
             icon={<IconShield />}
           />
         </div>
@@ -229,11 +229,11 @@ export default function Dashboard() {
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="text-center p-3 rounded-lg bg-danger-muted ring-1 ring-danger-border">
                       <div className="text-xl font-display font-bold text-tone-danger tabular-nums">{security.criticalCount}</div>
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Critical</div>
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Crítico</div>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-warning-muted ring-1 ring-warning-border">
                       <div className="text-xl font-display font-bold text-tone-warning tabular-nums">{security.warningCount}</div>
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Warning</div>
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Aviso</div>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-overlay ring-1 ring-border">
                       <div className="text-xl font-display font-bold text-text tabular-nums">{security.latestTagCount}</div>

@@ -34,11 +34,12 @@ func NewScanner(pool *dockerclient.Pool, n *Notifier, st *store.Store) *Scanner 
 }
 
 func (s *Scanner) Start(ctx context.Context) {
+	// Sempre varre e grava histórico local; canais externos (Telegram/Discord) são opcionais.
 	if s.Notifier == nil || !s.Notifier.Enabled() {
-		log.Println("alertas: desabilitado (configure canais ALERT_*)")
-		return
+		log.Println("alertas: histórico local ativo (sem canais externos — opcional: ALERT_*)")
+	} else {
+		log.Printf("alertas: scanner ativo a cada %s (com notificação externa)", s.Interval)
 	}
-	log.Printf("alertas: scanner ativo a cada %s", s.Interval)
 	t := time.NewTicker(s.Interval)
 	go func() {
 		s.runOnce(ctx)
@@ -76,7 +77,7 @@ func (s *Scanner) runOnce(ctx context.Context) {
 				continue
 			}
 			s.fire(h, p.ContainerID, p.Name, string(p.Severity),
-				fmt.Sprintf("dockpanel · %s · %s", h.Label, p.Name),
+				fmt.Sprintf("Dockwatch · %s · %s", h.Label, p.Name),
 				fmt.Sprintf("Host: %s\nMotivo: %s\nEstado: %s · exit %d · restarts %d\nContainer: %s",
 					h.Label, p.Reason, p.State, p.ExitCode, p.RestartCount, p.ContainerID[:12]),
 				"container_down")
@@ -86,8 +87,8 @@ func (s *Scanner) runOnce(ctx context.Context) {
 
 func (s *Scanner) evalServerOffline(_ context.Context, h dockerclient.HostConfig) {
 	s.fire(h, "", h.Label, "critical",
-		fmt.Sprintf("dockpanel · %s offline", h.Label),
-		fmt.Sprintf("Servidor %s (%s) não respondeu ping Docker.", h.Label, h.ID),
+		fmt.Sprintf("Dockwatch · %s offline", h.Label),
+		fmt.Sprintf("Host %s (%s) não respondeu ping Docker.", h.Label, h.ID),
 		"server_offline")
 }
 

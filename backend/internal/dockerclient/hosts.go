@@ -17,7 +17,7 @@ type HostConfig struct {
 type Pool struct {
 	mu        sync.RWMutex
 	hosts     []HostConfig
-	baseline  map[string]HostConfig // hosts from env (immutable baseline)
+	baseline  map[string]HostConfig // hosts from env
 	clis      map[string]*Client
 	defaultID string
 }
@@ -65,7 +65,7 @@ func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 	return p, nil
 }
 
-// Baseline returns only env-configured hosts (not dynamically merged org servers).
+// Baseline returns hosts configured from environment.
 func (p *Pool) Baseline() []HostConfig {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -172,12 +172,12 @@ func (p *Pool) UpsertHost(h HostConfig) error {
 	return nil
 }
 
-// RemoveHost removes a host from the pool (does not remove baseline entries from baseline map).
+// RemoveHost removes a non-baseline host from the pool.
 func (p *Pool) RemoveHost(id string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if _, isBase := p.baseline[id]; isBase {
-		return // never drop env hosts from pool listing of baseline
+		return
 	}
 	if c, ok := p.clis[id]; ok && c != nil && c.CLI != nil {
 		_ = c.CLI.Close()
@@ -196,7 +196,6 @@ func (p *Pool) RemoveHost(id string) {
 }
 
 // MergeHosts upserts multiple hosts without removing existing ones.
-// Prefer scoped UpsertHost for a single org's servers; avoid merging all tenants at once.
 func (p *Pool) MergeHosts(hosts []HostConfig) error {
 	for _, h := range hosts {
 		if err := p.UpsertHost(h); err != nil {

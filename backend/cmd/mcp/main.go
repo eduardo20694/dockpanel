@@ -1,7 +1,5 @@
-// Comando dockpanel-mcp é o servidor MCP local. Ele roda via stdio,
-// pensado pra ser registrado no Claude Desktop, e reaproveita o mesmo
-// dockerclient + diagnostics que o backend REST usa — a mesma "verdade"
-// dos dois lados, só que exposta como ferramentas de agente aqui.
+// Servidor MCP stdio (Cursor / Claude Desktop).
+// Reutiliza o mesmo dockerclient + diagnostics da API REST.
 package main
 
 import (

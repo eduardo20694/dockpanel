@@ -24,26 +24,26 @@ func TestGetIfAllowedBlocksForeignHost(t *testing.T) {
 	}
 }
 
-func TestBaselineDoesNotIncludeMerged(t *testing.T) {
+func TestBaselineDoesNotIncludeUpserted(t *testing.T) {
 	pool, err := dockerclient.NewPool([]dockerclient.HostConfig{
 		{ID: "env", Label: "env", DockerHost: ""},
 	}, "env")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.UpsertHost(dockerclient.HostConfig{ID: "org-b-server", Label: "leak", DockerHost: ""}); err != nil {
+	if err := pool.UpsertHost(dockerclient.HostConfig{ID: "extra", Label: "extra", DockerHost: ""}); err != nil {
 		t.Fatal(err)
 	}
 	base := pool.Baseline()
 	for _, h := range base {
-		if h.ID == "org-b-server" {
-			t.Fatal("merged org host must not appear in Baseline")
+		if h.ID == "extra" {
+			t.Fatal("upserted host must not appear in Baseline")
 		}
 	}
 	if !pool.IsBaseline("env") {
 		t.Fatal("env should be baseline")
 	}
-	if pool.IsBaseline("org-b-server") {
-		t.Fatal("org server must not be baseline")
+	if pool.IsBaseline("extra") {
+		t.Fatal("extra must not be baseline")
 	}
 }

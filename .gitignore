@@ -8,16 +8,22 @@ frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 **/dist/
 
-# Go binaries
+# Go binaries (gere localmente — não versionar)
 *.exe
 *.exe~
 backend/*.exe
 backend/*.exe~
 backend/dockpanel-mcp
 backend/dockpanel-server
+backend/dockpanel-agent
+backend/dockwatch-mcp
+backend/dockwatch-server
 backend/bin/
 dockpanel-mcp
 dockpanel-server
+dockpanel-agent
+dockwatch-mcp
+dockwatch-server
 
 # Runtime data
 data/*
@@ -28,6 +34,7 @@ backend/data/*
 # Backups de volumes
 backend/backups/
 dockpanel-backups/
+dockwatch-backups/
 
 # Variáveis de ambiente / segredos
 .env
@@ -43,7 +50,7 @@ id_ed25519
 id_ed25519.*
 known_hosts
 
-# Config local do Cursor MCP
+# Config local do Cursor MCP (use mcp.json.example)
 .cursor/mcp.json
 
 # Playwright MCP dumps

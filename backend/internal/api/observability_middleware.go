@@ -116,7 +116,7 @@ func (s *Server) clientErrorLog(w http.ResponseWriter, r *http.Request) {
 func (s *Server) openAPISpec(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]interface{}{
 		"openapi": "3.0.3",
-		"info":    map[string]string{"title": "Dockpanel API", "version": "1.0.0"},
+		"info":    map[string]string{"title": "Dockwatch API", "version": "1.0.0"},
 		"paths": map[string]interface{}{
 			"/health":      map[string]interface{}{"get": map[string]string{"summary": "Health"}},
 			"/auth/login":  map[string]interface{}{"post": map[string]string{"summary": "Login"}},

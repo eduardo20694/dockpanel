@@ -23,7 +23,7 @@ var (
 	ErrAuthDisabled       = errors.New("autenticação desabilitada")
 )
 
-// User is the single local admin (no multi-tenant / Postgres).
+// User is the configured admin from DOCKPANEL_ADMIN_* env.
 type User struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`

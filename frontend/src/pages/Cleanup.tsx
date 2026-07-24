@@ -34,7 +34,7 @@ export default function Cleanup() {
     <PageShell>
       <PageInner>
         <div className="mb-6">
-          <h1 className="font-display font-bold text-2xl text-text">Cleanup / Safe Prune</h1>
+          <h1 className="font-display font-bold text-2xl text-text">Limpeza</h1>
           <p className="text-text-muted text-sm mt-1">
             Relatório do que pode ser limpo em {hostLabel} — sem remover automaticamente.
           </p>

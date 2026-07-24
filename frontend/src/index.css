@@ -166,7 +166,7 @@
   }
 
   .page-shell { @apply relative min-h-full animate-fade-in; }
-  .page-inner { @apply px-8 py-7 max-w-6xl mx-auto w-full min-h-full; }
+  .page-inner { @apply px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7 max-w-6xl mx-auto w-full min-h-full; }
 
   .glass {
     background: var(--c-glass-bg);

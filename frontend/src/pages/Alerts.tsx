@@ -33,7 +33,7 @@ export default function Alerts() {
         <div className="mb-6">
           <h1 className="font-display font-bold text-2xl text-text">Alertas</h1>
           <p className="text-text-muted text-sm mt-1">
-            Histórico local (canais via ALERT_TELEGRAM_* / ALERT_DISCORD_WEBHOOK no .env).
+            Histórico local de eventos críticos. Notificações externas (Telegram/Discord) são opcionais via ALERT_* no .env.
           </p>
         </div>
 
@@ -41,7 +41,9 @@ export default function Alerts() {
           <Card>
             <ul className="divide-y divide-border">
               {history.length === 0 ? (
-                <li className="p-4 text-text-muted text-sm">Nenhum alerta registrado.</li>
+                <li className="p-4 text-text-muted text-sm">
+                  Nenhum alerta ainda. O scanner grava problemas critical automaticamente a cada poucos minutos.
+                </li>
               ) : (
                 history.map((a, i) => (
                   <li key={a.id || i} className="px-4 py-3 text-sm">

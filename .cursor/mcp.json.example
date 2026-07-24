@@ -1,10 +1,19 @@
 {
   "mcpServers": {
-    "dockwatch": {
-      "command": "c:\\Github\\dockpanel\\backend\\dockpanel-mcp.exe",
+    "dockwatch-vps": {
+      "command": "C:\\caminho\\para\\dockpanel\\backend\\dockwatch-mcp.exe",
+      "env": {
+        "DOCKPANEL_HOSTS": "[{\"id\":\"vps\",\"label\":\"VPS\",\"dockerHost\":\"ssh://root@SEU_IP\"}]",
+        "DOCKPANEL_COMPOSE_PATH": "C:\\caminho\\para\\dockpanel",
+        "DOCKPANEL_COMPOSE_PATH_REMOTE": "/opt/dockpanel",
+        "PATH": "C:\\Windows\\System32\\OpenSSH;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0"
+      }
+    },
+    "dockwatch-local": {
+      "command": "C:\\caminho\\para\\dockpanel\\backend\\dockwatch-mcp.exe",
       "env": {
         "DOCKPANEL_HOSTS": "[{\"id\":\"local\",\"label\":\"Local\",\"dockerHost\":\"\"}]",
-        "DOCKPANEL_COMPOSE_PATH": "c:\\Github\\dockpanel"
+        "DOCKPANEL_COMPOSE_PATH": "C:\\caminho\\para\\dockpanel"
       }
     }
   }
