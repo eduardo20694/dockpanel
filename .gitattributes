@@ -1,0 +1,11 @@
+# Patterns for git archive (export-ignore) — keeps release zips clean
+.cursor/ export-ignore
+frontend/node_modules/ export-ignore
+frontend/dist/ export-ignore
+*.exe export-ignore
+*.zip export-ignore
+data/ export-ignore
+backend/data/ export-ignore
+backend/backups/ export-ignore
+.env export-ignore
+.github/workflows/ export-ignore

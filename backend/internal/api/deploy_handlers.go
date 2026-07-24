@@ -70,6 +70,14 @@ func (s *Server) deployComposeStatus(w http.ResponseWriter, r *http.Request) {
 			path = presets[0].ProjectPath
 		}
 	}
+	if path == "" {
+		writeJSON(w, map[string]interface{}{
+			"services": []deploy.ServiceStatus{},
+			"result":   nil,
+			"hint":     "Defina DOCKPANEL_COMPOSE_PATH ou informe a pasta com docker-compose.yml",
+		})
+		return
+	}
 	hostID := dockerclient.HostIDFromRequest(r.Header.Get("X-Dockpanel-Host"), r.URL.Query().Get("host"))
 	req := deploy.ComposeRequest{ProjectPath: path, Action: "ps"}
 	for _, h := range s.Hosts.List() {

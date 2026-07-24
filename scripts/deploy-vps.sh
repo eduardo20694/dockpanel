@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
-# Deploy dockpanel na VPS (rode na pasta do projeto: /root/dockpanel)
+# Uso: ./scripts/deploy-vps.sh   (na VPS, depois do push da imagem)
+# Expecta .env com VERSION=x.x.x e admin/JWT.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 if [[ ! -f .env ]]; then
-  echo "Erro: crie .env a partir de .env.vps.example"
+  echo "Crie .env (veja .env.vps.example) ou cole as vars no Portainer."
   exit 1
 fi
 
-echo "==> Build e subida dos containers"
-docker compose pull 2>/dev/null || true
-docker compose up -d --build
+# shellcheck disable=SC1091
+set -a && source .env && set +a
+
+echo "==> Pull redecoop/dockwatch:1.0.0"
+docker compose pull
+
+echo "==> Up"
+docker compose up -d
 
 echo ""
-echo "==> Status"
 docker compose ps
-
-echo ""
-echo "Painel: http://$(hostname -I | awk '{print $1}'):8083"
-echo "Logs: docker compose logs -f dockpanel"
+IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+echo "Painel: http://${IP:-localhost}:8083"
+echo "Logs:  docker compose logs -f dockpanel"

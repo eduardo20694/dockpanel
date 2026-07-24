@@ -14,6 +14,7 @@ import (
 	"dockpanel/internal/auth"
 	"dockpanel/internal/collector"
 	"dockpanel/internal/dockerclient"
+	"dockpanel/internal/observability"
 	"dockpanel/internal/store"
 
 	"github.com/joho/godotenv"
@@ -21,7 +22,7 @@ import (
 
 func loadEnv() {
 	candidates := []string{
-		filepath.Join("..", ".env"), // backend/ → raiz do repo
+		filepath.Join("..", ".env"),
 		".env",
 	}
 	if root := os.Getenv("DOCKPANEL_ROOT"); root != "" {
@@ -43,6 +44,9 @@ func loadEnv() {
 
 func main() {
 	loadEnv()
+	observability.Init()
+	defer observability.Flush()
+
 	pool, err := dockerclient.NewPoolFromEnv()
 	if err != nil {
 		log.Fatalf("erro ao conectar hosts Docker: %v", err)
@@ -65,26 +69,22 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	alerts.NewScanner(pool, alerts.NewFromEnv(), st).Start(ctx)
-	collector.New(pool, st).Start(ctx)
-
-	authStore, err := auth.Open(ctx)
-	if err != nil {
-		log.Fatalf("postgres/auth: %v", err)
-	}
-	defer authStore.Close()
-
-	authSvc, err := auth.NewService(authStore)
+	authSvc, err := auth.NewService()
 	if err != nil {
 		log.Fatalf("auth: %v", err)
 	}
 	if authSvc.Enabled {
-		log.Printf("auth: login ativo (PostgreSQL)")
+		log.Printf("auth: login ativo (admin env)")
 	} else {
-		log.Printf("auth: desabilitado (defina DATABASE_URL para exigir login)")
+		log.Printf("auth: desabilitado (defina DOCKPANEL_ADMIN_EMAIL e DOCKPANEL_ADMIN_PASSWORD)")
 	}
 
-	server := api.NewServer(pool, st, authSvc)
+	alerts.NewScanner(pool, alerts.NewFromEnv(), st).Start(ctx)
+	collector.New(pool, st).Start(ctx)
+
+	server := api.NewServerFromDeps(api.Deps{
+		Hosts: pool, Store: st, Auth: authSvc,
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

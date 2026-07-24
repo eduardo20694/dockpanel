@@ -14,11 +14,20 @@ export function LoadingState({ label = 'Carregando…' }: { label?: string }) {
 
 export function BackendError({
   message,
-  hint = 'Reinicie o backend e confira se o Docker da VPS está acessível via SSH.',
+  hint,
 }: {
   message: string
   hint?: string
 }) {
+  const lower = (message || '').toLowerCase()
+  const autoHint =
+    hint ||
+    (lower.includes('não permitido') || lower.includes('host')
+      ? 'Selecione um host válido no topo (DOCKPANEL_HOSTS / socket / ssh:// no .env).'
+        : lower.includes('docker')
+        ? 'Docker inacessível neste host. Confira socket local ou SSH no DOCKPANEL_HOSTS.'
+        : 'Reinicie o backend e confira se o host Docker está acessível.')
+
   return (
     <div className="page-inner">
       <div className="card-bordered max-w-md p-6 border-danger-border bg-danger-muted animate-slide-up">
@@ -27,9 +36,9 @@ export function BackendError({
             <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
           </svg>
         </div>
-        <div className="text-tone-danger font-display font-bold mb-1">Backend indisponível</div>
+        <div className="text-tone-danger font-display font-bold mb-1">Falha ao carregar</div>
         <div className="text-sm text-text-secondary font-mono mb-3 break-all">{message}</div>
-        <div className="text-xs text-text-muted leading-relaxed">{hint}</div>
+        <div className="text-xs text-text-muted leading-relaxed">{autoHint}</div>
       </div>
     </div>
   )

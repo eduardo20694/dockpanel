@@ -7,9 +7,10 @@ import { PageShell, PageInner, MetricCard, Card, Section, ListPanel } from '../c
 import { usePoll } from '../lib/usePoll'
 
 export default function Dashboard() {
-  const { hostId, vpsLabel } = useHost()
+  const { hostId, hostLabel } = useHost()
   const [data, setData] = useState<any>(null)
   const [security, setSecurity] = useState<any>(null)
+  const [hostInfo, setHostInfo] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const firstLoad = useRef(true)
@@ -19,10 +20,15 @@ export default function Dashboard() {
   const load = useCallback(() => {
     const spin = firstLoad.current
     if (spin) setLoading(true)
-    Promise.all([api.executive.summary(), api.security.audit()])
-      .then(([exec, sec]) => {
+    Promise.all([
+      api.executive.summary(),
+      api.security.audit(),
+      api.system.info().catch(() => null),
+    ])
+      .then(([exec, sec, infoRes]) => {
         setData(exec)
         setSecurity(sec)
+        setHostInfo(infoRes?.info || infoRes)
         setError(null)
       })
       .catch((e: Error) => setError(e.message))
@@ -58,7 +64,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <h1 className="font-display font-bold text-3xl md:text-4xl tracking-tight text-text mb-2">
-                {vpsLabel}
+                {hostLabel}
               </h1>
               <p className="text-text-muted text-[15px] max-w-lg">
                 Painel de controle Docker com diagnóstico inteligente, auditoria de segurança e visão por stack.
@@ -86,6 +92,22 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {hostInfo && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <MetricCard label="CPUs" value={hostInfo.NCPU ?? hostInfo.ncpu ?? '—'} />
+            <MetricCard
+              label="Memória"
+              value={
+                hostInfo.MemTotal || hostInfo.memTotal
+                  ? `${Math.round((hostInfo.MemTotal || hostInfo.memTotal) / 1e9)} GB`
+                  : '—'
+              }
+            />
+            <MetricCard label="Containers" value={hostInfo.Containers ?? hostInfo.containers ?? '—'} />
+            <MetricCard label="Imagens" value={hostInfo.Images ?? hostInfo.images ?? '—'} />
+          </div>
+        )}
 
         {hasCritical ? (
           <div className="alert-danger mb-6">

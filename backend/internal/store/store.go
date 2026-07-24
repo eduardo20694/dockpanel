@@ -109,12 +109,16 @@ func (s *Store) MetricsHistory(hostID, containerID string, since time.Time, limi
 	cutoff := since.UnixMilli()
 	var out []MetricSample
 	for _, r := range rows {
-		if r.HostID == hostID && r.ContainerID == containerID && r.Timestamp >= cutoff {
-			out = append(out, MetricSample{
-				CPUPct: r.CPUPct, MemPct: r.MemPct, MemUsage: r.MemUsage,
-				RestartCount: r.RestartCount, Timestamp: r.Timestamp,
-			})
+		if r.HostID != hostID || r.Timestamp < cutoff {
+			continue
 		}
+		if containerID != "" && r.ContainerID != containerID {
+			continue
+		}
+		out = append(out, MetricSample{
+			CPUPct: r.CPUPct, MemPct: r.MemPct, MemUsage: r.MemUsage,
+			RestartCount: r.RestartCount, Timestamp: r.Timestamp,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Timestamp < out[j].Timestamp })
 	if len(out) > limit {

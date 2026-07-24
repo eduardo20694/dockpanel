@@ -15,12 +15,10 @@ func IsSSHHost(dockerHost string) bool {
 	return strings.HasPrefix(dockerHost, "ssh://")
 }
 
-// RemoteComposePath pasta do compose na VPS (MCP / deploy remoto).
+// RemoteComposePath pasta do compose em host SSH (MCP / deploy remoto).
+// Vazio se não configurado — o chamador deve informar project_path.
 func RemoteComposePath() string {
-	if p := strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH_REMOTE")); p != "" {
-		return p
-	}
-	return "/root/dockpanel"
+	return strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH_REMOTE"))
 }
 
 // ResolveComposePath escolhe pasta local (drift) ou remota (deploy SSH).
@@ -35,10 +33,7 @@ func ResolveComposePath(dockerHost, projectPath string) string {
 	if projectPath != "" {
 		return projectPath
 	}
-	if p := strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH")); p != "" {
-		return p
-	}
-	return `c:\Github\dockpanel`
+	return DefaultComposePath()
 }
 
 func isWindowsAbsPath(p string) bool {

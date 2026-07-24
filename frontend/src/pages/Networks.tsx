@@ -55,7 +55,7 @@ export default function Networks() {
         <PageHeader
           large
           title="Redes"
-          description="Topologia de rede Docker da VPS — atualiza a cada 15s."
+          description="Topologia de rede Docker neste host — atualiza a cada 15s."
           badge={!loading && <span className="badge-neutral tabular-nums">{networks.length} redes</span>}
         />
 

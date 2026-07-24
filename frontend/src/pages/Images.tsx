@@ -11,6 +11,8 @@ export default function Images() {
   const [images, setImages] = useState<ImageSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [scanning, setScanning] = useState<string | null>(null)
+  const [scanNote, setScanNote] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const firstLoad = useRef(true)
 
   useEffect(() => { firstLoad.current = true }, [hostId])
@@ -36,12 +38,23 @@ export default function Images() {
   usePoll(refresh, [hostId, refresh])
 
   async function scan(id: string, tag: string) {
-    const ref = tag && tag !== '<none>:<none>' ? tag.split(',')[0] : id
+    const ref = (tag && tag !== '<none>:<none>' ? tag.split(',')[0] : id).trim()
+    setScanning(ref)
+    setScanNote(null)
     try {
       const report = await api.images.scan(ref)
-      alert(report.rawNote || `CVEs: ${report.vulnCount} (critical: ${report.criticalCount}, high: ${report.highCount})`)
+      const note = String(report.rawNote || '')
+      const unavailable = /não encontrado|falhou/i.test(note) && report.vulnCount === 0
+      if (unavailable) {
+        setScanNote({ tone: 'err', text: note })
+        return
+      }
+      const summary = `CVEs: ${report.vulnCount} (critical: ${report.criticalCount}, high: ${report.highCount})`
+      setScanNote({ tone: 'ok', text: note ? `${summary} — ${note}` : summary })
     } catch (e: any) {
-      alert(e.message)
+      setScanNote({ tone: 'err', text: e.message || 'Falha no scan Trivy' })
+    } finally {
+      setScanning(null)
     }
   }
 
@@ -73,6 +86,20 @@ export default function Images() {
 
         {loading && <LoadingState />}
         {error && <BackendError message={error} />}
+        {scanNote && (
+          <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+            scanNote.tone === 'err'
+              ? 'border-danger-border bg-danger-muted text-tone-danger'
+              : 'border-border bg-surface text-text-secondary'
+          }`}>
+            {scanNote.text}
+          </div>
+        )}
+        {scanning && (
+          <p className="mb-4 text-sm text-text-muted animate-pulse">
+            Escaneando <span className="font-mono">{scanning}</span> com Trivy (pode baixar a imagem do scanner na 1ª vez)…
+          </p>
+        )}
 
         {!loading && !error && (
           <DataTableWrap>
@@ -93,7 +120,12 @@ export default function Images() {
                     <td className="tabular-nums">{(img.Size / 1e6).toFixed(1)} MB</td>
                     <td className="text-right">
                       <div className="inline-flex gap-1">
-                        <Btn label="Trivy" onClick={() => scan(img.Id, img.RepoTags?.join(', ') || '')} variant="primary" />
+                        <Btn
+                          label={scanning ? '…' : 'Trivy'}
+                          disabled={!!scanning}
+                          onClick={() => scan(img.Id, img.RepoTags?.join(', ') || '')}
+                          variant="primary"
+                        />
                         <Btn label="Remover" onClick={() => remove(img.Id)} variant="danger" />
                       </div>
                     </td>

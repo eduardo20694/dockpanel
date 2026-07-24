@@ -4,7 +4,9 @@ const BASE = '/api'
 
 function hostHeaders(): Record<string, string> {
   const host = localStorage.getItem('dockpanel-host')
-  return host && host !== 'default' && host !== 'all' ? { 'X-Dockpanel-Host': host } : {}
+  const h: Record<string, string> = {}
+  if (host && host !== 'default' && host !== 'all') h['X-Dockpanel-Host'] = host
+  return h
 }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -13,13 +15,11 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...hostHeaders(), ...(opts.headers as object) },
     ...opts,
   })
+  const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    const err = new Error(body.error || `Erro ${res.status}`) as Error & { result?: unknown }
-    if (body.result) err.result = body.result
-    throw err
+    throw new Error(body.error || `Erro ${res.status}`)
   }
-  return res.json()
+  return body as T
 }
 
 function wsUrl(path: string) {
@@ -36,13 +36,23 @@ function isAllHosts() {
 export const api = {
   auth: {
     config: () => request<{ enabled: boolean }>('/auth/config'),
-    me: () => request<{ authEnabled: boolean; user: AuthUser | null }>('/auth/me'),
+    me: () => request<{ user: AuthUser | null }>('/auth/me'),
     login: (email: string, password: string) =>
       request<{ user: AuthUser }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
-    logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+    logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+  },
+  metrics: {
+    series: (opts?: { host?: string; container?: string; hours?: number }) => {
+      const q = new URLSearchParams()
+      if (opts?.host) q.set('host', opts.host)
+      if (opts?.container) q.set('container', opts.container)
+      if (opts?.hours) q.set('hours', String(opts.hours))
+      return request<{ t: string; cpu: number; mem: number }[]>(`/metrics/series?${q}`)
+    },
+    host: (hours = 24) => request<{ t: string; cpu: number; mem: number }[]>(`/metrics/host?hours=${hours}`),
   },
   hosts: {
     list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string }[] }>('/hosts'),

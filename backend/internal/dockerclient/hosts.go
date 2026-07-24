@@ -17,6 +17,7 @@ type HostConfig struct {
 type Pool struct {
 	mu        sync.RWMutex
 	hosts     []HostConfig
+	baseline  map[string]HostConfig // hosts from env (immutable baseline)
 	clis      map[string]*Client
 	defaultID string
 }
@@ -48,11 +49,13 @@ func NewPoolFromEnv() (*Pool, error) {
 
 func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 	p := &Pool{
-		hosts:     hosts,
+		hosts:     append([]HostConfig(nil), hosts...),
+		baseline:  make(map[string]HostConfig, len(hosts)),
 		clis:      make(map[string]*Client),
 		defaultID: defaultID,
 	}
 	for _, h := range hosts {
+		p.baseline[h.ID] = h
 		cli, err := newWithHost(h.DockerHost)
 		if err != nil {
 			return nil, fmt.Errorf("host %q: %w", h.ID, err)
@@ -60,6 +63,27 @@ func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 		p.clis[h.ID] = cli
 	}
 	return p, nil
+}
+
+// Baseline returns only env-configured hosts (not dynamically merged org servers).
+func (p *Pool) Baseline() []HostConfig {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := make([]HostConfig, 0, len(p.baseline))
+	for _, h := range p.baseline {
+		out = append(out, h)
+	}
+	return out
+}
+
+func (p *Pool) IsBaseline(id string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if id == "" || id == "default" {
+		id = p.defaultID
+	}
+	_, ok := p.baseline[id]
+	return ok
 }
 
 func (p *Pool) List() []HostConfig {
@@ -85,6 +109,30 @@ func (p *Pool) Get(id string) (*Client, error) {
 	return c, nil
 }
 
+// GetIfAllowed returns a client only when id is in allowedIDs (or empty id → first allowed / default if allowed).
+func (p *Pool) GetIfAllowed(id string, allowedIDs map[string]bool) (*Client, string, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if id == "" || id == "default" {
+		if allowedIDs[p.defaultID] {
+			id = p.defaultID
+		} else {
+			for aid := range allowedIDs {
+				id = aid
+				break
+			}
+		}
+	}
+	if id == "" || !allowedIDs[id] {
+		return nil, "", fmt.Errorf("host não permitido")
+	}
+	c, ok := p.clis[id]
+	if !ok {
+		return nil, "", fmt.Errorf("host desconhecido: %q", id)
+	}
+	return c, id, nil
+}
+
 func HostIDFromRequest(hostHeader, queryHost string) string {
 	if h := strings.TrimSpace(hostHeader); h != "" && h != "default" {
 		return h
@@ -93,4 +141,67 @@ func HostIDFromRequest(hostHeader, queryHost string) string {
 		return h
 	}
 	return ""
+}
+
+// UpsertHost adds or replaces a host connection in the pool.
+func (p *Pool) UpsertHost(h HostConfig) error {
+	cli, err := newWithHost(h.DockerHost)
+	if err != nil {
+		return fmt.Errorf("host %q: %w", h.ID, err)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	found := false
+	for i := range p.hosts {
+		if p.hosts[i].ID == h.ID {
+			p.hosts[i] = h
+			found = true
+			break
+		}
+	}
+	if !found {
+		p.hosts = append(p.hosts, h)
+	}
+	if old, ok := p.clis[h.ID]; ok && old != nil && old.CLI != nil {
+		_ = old.CLI.Close()
+	}
+	p.clis[h.ID] = cli
+	if p.defaultID == "" {
+		p.defaultID = h.ID
+	}
+	return nil
+}
+
+// RemoveHost removes a host from the pool (does not remove baseline entries from baseline map).
+func (p *Pool) RemoveHost(id string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if _, isBase := p.baseline[id]; isBase {
+		return // never drop env hosts from pool listing of baseline
+	}
+	if c, ok := p.clis[id]; ok && c != nil && c.CLI != nil {
+		_ = c.CLI.Close()
+		delete(p.clis, id)
+	}
+	filtered := p.hosts[:0]
+	for _, h := range p.hosts {
+		if h.ID != id {
+			filtered = append(filtered, h)
+		}
+	}
+	p.hosts = filtered
+	if p.defaultID == id && len(p.hosts) > 0 {
+		p.defaultID = p.hosts[0].ID
+	}
+}
+
+// MergeHosts upserts multiple hosts without removing existing ones.
+// Prefer scoped UpsertHost for a single org's servers; avoid merging all tenants at once.
+func (p *Pool) MergeHosts(hosts []HostConfig) error {
+	for _, h := range hosts {
+		if err := p.UpsertHost(h); err != nil {
+			return err
+		}
+	}
+	return nil
 }

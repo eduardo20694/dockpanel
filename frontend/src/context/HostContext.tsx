@@ -7,67 +7,60 @@ export interface DockerHost {
   dockerHost: string
 }
 
-const VPS_HOST_ID = 'vps'
-
 interface HostContextValue {
   hosts: DockerHost[]
   hostId: string
   setHostId: (id: string) => void
   loading: boolean
-  vpsLabel: string
+  hostLabel: string
 }
 
 const HostContext = createContext<HostContextValue>({
   hosts: [],
-  hostId: VPS_HOST_ID,
+  hostId: '',
   setHostId: () => {},
   loading: true,
-  vpsLabel: 'VPS',
+  hostLabel: 'Host',
 })
-
-function filterVpsOnly(hosts: DockerHost[]): DockerHost[] {
-  const vps = hosts.filter((h) => h.id === VPS_HOST_ID || h.dockerHost.startsWith('ssh://'))
-  return vps.length > 0 ? vps : hosts.filter((h) => h.id !== 'local')
-}
 
 export function HostProvider({ children }: { children: ReactNode }) {
   const [hosts, setHosts] = useState<DockerHost[]>([])
-  const [hostId, setHostIdState] = useState(
-    () => localStorage.getItem('dockpanel-host') || VPS_HOST_ID
-  )
+  const [hostId, setHostIdState] = useState(() => localStorage.getItem('dockpanel-host') || '')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     api.hosts
       .list()
       .then((data) => {
-        const filtered = filterVpsOnly(data.hosts || [])
-        setHosts(filtered)
-        const vpsHost = filtered.find((h) => h.id === VPS_HOST_ID) || filtered[0]
-        const target = vpsHost?.id || VPS_HOST_ID
-        setHostIdState(target)
-        localStorage.setItem('dockpanel-host', target)
+        const merged = data.hosts || []
+        setHosts(merged)
+        const saved = localStorage.getItem('dockpanel-host')
+        const pick =
+          merged.find((h) => h.id === saved) ||
+          merged.find((h) => h.id === data.defaultHost) ||
+          merged[0]
+        if (pick) {
+          setHostIdState(pick.id)
+          localStorage.setItem('dockpanel-host', pick.id)
+        } else {
+          setHostIdState('')
+          localStorage.removeItem('dockpanel-host')
+        }
       })
+      .catch(() => setHosts([]))
       .finally(() => setLoading(false))
   }, [])
 
   function setHostId(id: string) {
-    localStorage.setItem('dockpanel-host', id)
     setHostIdState(id)
+    localStorage.setItem('dockpanel-host', id)
   }
 
   const current = hosts.find((h) => h.id === hostId)
+  const hostLabel = current?.label || current?.id || 'Host'
 
   return (
-    <HostContext.Provider
-      value={{
-        hosts,
-        hostId,
-        setHostId,
-        loading,
-        vpsLabel: current?.label || 'VPS',
-      }}
-    >
+    <HostContext.Provider value={{ hosts, hostId, setHostId, loading, hostLabel }}>
       {children}
     </HostContext.Provider>
   )

@@ -5,10 +5,12 @@ const groups = [
   {
     label: 'Overview',
     items: [
-      { to: '/', label: 'Executivo', icon: ChartIcon },
+      { to: '/', label: 'Overview', icon: ChartIcon },
       { to: '/problems', label: 'Erros', icon: AlertIcon },
       { to: '/stacks', label: 'Stacks', icon: StackIcon },
       { to: '/security', label: 'Segurança', icon: ShieldIcon },
+      { to: '/alerts', label: 'Alertas', icon: BellIcon },
+      { to: '/metrics', label: 'Métricas', icon: ChartIcon },
     ],
   },
   {
@@ -18,16 +20,19 @@ const groups = [
       { to: '/images', label: 'Imagens', icon: ImageIcon },
       { to: '/volumes', label: 'Volumes', icon: DiskIcon },
       { to: '/networks', label: 'Redes', icon: NetworkIcon },
+      { to: '/cleanup', label: 'Cleanup', icon: TrashIcon },
     ],
   },
   {
     label: 'Operações',
-    items: [{ to: '/deploy', label: 'Deploy', icon: RocketIcon }],
+    items: [
+      { to: '/deploy', label: 'Deploy', icon: RocketIcon },
+    ],
   },
 ]
 
 export default function Sidebar() {
-  const { vpsLabel } = useHost()
+  const { hostLabel } = useHost()
   const location = useLocation()
 
   function isActive(to: string) {
@@ -38,17 +43,10 @@ export default function Sidebar() {
     <aside className="w-[240px] shrink-0 flex flex-col border-r border-border bg-surface backdrop-blur-xl">
       <div className="h-14 flex items-center px-5 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-brand flex items-center justify-center shadow-glow-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" />
-            </svg>
-          </div>
+          <img src="/favicon.svg" alt="" className="w-8 h-8 rounded-lg" width={32} height={32} />
           <div>
-            <div className="font-display font-bold text-[15px] tracking-tight text-text">dockpanel</div>
-            <div className="text-[10px] text-text-faint font-medium tracking-wide">DOCKER OPS</div>
+            <div className="font-display font-bold text-[15px] tracking-tight text-text">Dockwatch</div>
+            <div className="text-[10px] text-text-faint font-medium tracking-wide">DOCKER WATCH</div>
           </div>
         </div>
       </div>
@@ -89,8 +87,8 @@ export default function Sidebar() {
             <span className="live-dot w-2 h-2" />
             <span className="text-[10px] font-bold uppercase tracking-wider text-tone-brand-strong">Live</span>
           </div>
-          <div className="text-sm font-semibold text-text truncate">{vpsLabel}</div>
-          <div className="text-[11px] text-text-muted mt-0.5">SSH · Produção</div>
+          <div className="text-sm font-semibold text-text truncate">{hostLabel}</div>
+          <div className="text-[11px] text-text-muted mt-0.5">Dockwatch</div>
         </div>
       </div>
     </aside>
@@ -162,6 +160,20 @@ function RocketIcon({ active }: { active: boolean }) {
     <svg className={iconCls(active)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
       <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z" />
       <path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z" />
+    </svg>
+  )
+}
+function BellIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={iconCls(active)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+    </svg>
+  )
+}
+function TrashIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={iconCls(active)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
     </svg>
   )
 }

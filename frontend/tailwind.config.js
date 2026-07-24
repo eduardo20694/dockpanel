@@ -21,14 +21,14 @@ export default {
           faint: 'var(--c-text-faint)',
         },
         brand: {
-          DEFAULT: '#6366F1',
-          light: '#818CF8',
-          dark: '#4F46E5',
-          glow: 'rgba(99, 102, 241, 0.25)',
+          DEFAULT: 'var(--c-accent)',
+          light: 'var(--c-brand-text-strong)',
+          dark: 'var(--c-brand-text)',
+          glow: 'var(--c-accent-muted)',
         },
         accent: {
-          DEFAULT: '#6366F1',
-          hover: '#818CF8',
+          DEFAULT: 'var(--c-accent)',
+          hover: 'var(--c-brand-text-strong)',
           muted: 'var(--c-accent-muted)',
           border: 'var(--c-accent-border)',
         },
@@ -49,8 +49,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+        sans: ['Figtree', 'system-ui', 'sans-serif'],
+        display: ['Syne', 'Figtree', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
@@ -61,7 +61,7 @@ export default {
         elevated: 'var(--c-shadow-elevated)',
       },
       backgroundImage: {
-        'gradient-brand': 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%)',
+        'gradient-brand': 'linear-gradient(135deg, #60a5fa 0%, #3b9eff 45%, #2563eb 100%)',
         'gradient-brand-subtle': 'var(--c-gradient-brand-subtle)',
       },
       animation: {

@@ -23,8 +23,8 @@ export default function ContainerTerminal({
       theme: {
         background: bg,
         foreground: '#F4F4F5',
-        cursor: '#6366F1',
-        selectionBackground: 'rgba(99, 102, 241, 0.35)',
+        cursor: '#c8f542',
+        selectionBackground: 'rgba(200, 245, 66, 0.28)',
       },
       fontFamily: 'JetBrains Mono, monospace',
       fontSize: 13,

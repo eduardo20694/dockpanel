@@ -82,7 +82,7 @@ export default function Problems() {
         {error && <BackendError message={error} />}
         {!error && loading && <LoadingState label="Varredura em andamento…" />}
         {!error && !loading && problems.length === 0 && (
-          <EmptyState title="Infraestrutura saudável" description="Nenhum container com problema detectado na VPS." />
+          <EmptyState title="Infraestrutura saudável" description="Nenhum container com problema detectado neste host." />
         )}
 
         {!error && !loading && problems.length > 0 && (

@@ -403,7 +403,7 @@ func registerSystemOverview(s *server.MCPServer, pool *dockerclient.Pool) {
 
 func registerDeployCompose(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("deploy_compose",
-		mcp.WithDescription("Executa docker compose no host remoto via SSH ou local. Deploy na VPS usa DOCKPANEL_COMPOSE_PATH_REMOTE (/root/dockpanel). Drift usa compose local."),
+		mcp.WithDescription("Executa docker compose no host (local ou ssh://). Path: project_path, DOCKPANEL_COMPOSE_PATH ou DOCKPANEL_COMPOSE_PATH_REMOTE (SSH)."),
 		mcp.WithString("project_path", mcp.Description("pasta com docker-compose.yml (padrão: DOCKPANEL_COMPOSE_PATH)")),
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts); padrão: primeiro do DOCKPANEL_HOSTS")),
 		mcp.WithString("action", mcp.Description("up, down, build, ps ou pull (padrão: up)")),

@@ -1,6 +1,9 @@
 package scan
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeImageRef(t *testing.T) {
 	got := normalizeImageRef("redecoop%2Fredecoop%3A1.0.3")
@@ -63,5 +66,23 @@ func TestParseTrivyJSONEmpty(t *testing.T) {
 	}
 	if report.VulnCount != 0 {
 		t.Fatalf("expected 0 vulns")
+	}
+}
+
+func TestParseTrivyJSONStripsNoise(t *testing.T) {
+	raw := "pulling...\n{\"Results\":[]}\n"
+	report, err := parseTrivyJSON("x", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.VulnCount != 0 {
+		t.Fatalf("expected 0")
+	}
+}
+
+func TestDockerSockMount(t *testing.T) {
+	m := dockerSockMount()
+	if !strings.Contains(m, "docker.sock") {
+		t.Fatalf("mount %q", m)
 	}
 }

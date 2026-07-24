@@ -66,7 +66,7 @@ func (c *Collector) Start(ctx context.Context) {
 }
 
 func (c *Collector) runOnce(ctx context.Context) {
-	for _, h := range c.Pool.List() {
+	for _, h := range c.Pool.Baseline() {
 		cli, err := c.Pool.Get(h.ID)
 		if err != nil {
 			continue
@@ -90,12 +90,8 @@ func (c *Collector) runOnce(ctx context.Context) {
 			key := h.ID + ":" + ct.ID
 			c.mu.Lock()
 			prev := c.lastRest[key]
-			if info.RestartCount > prev && prev >= 0 {
-				if prev > 0 || info.RestartCount > 0 {
-					if info.RestartCount > prev {
-						_ = c.Store.RecordRestart(h.ID, ct.ID, name, info.RestartCount)
-					}
-				}
+			if info.RestartCount > prev && prev >= 0 && prev > 0 {
+				_ = c.Store.RecordRestart(h.ID, ct.ID, name, info.RestartCount)
 			}
 			if _, ok := c.lastRest[key]; !ok {
 				c.lastRest[key] = info.RestartCount

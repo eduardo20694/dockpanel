@@ -17,7 +17,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 function getInitialTheme(): Theme {
   const saved = localStorage.getItem('dockpanel-theme')
   if (saved === 'light' || saved === 'dark') return saved
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  return 'dark'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

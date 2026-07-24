@@ -27,7 +27,11 @@ func BackupVolume(ctx context.Context, volumeName, destDir, dockerHost string) (
 		return backupVolumeSSH(ctx, dockerHost, volumeName)
 	}
 	if destDir == "" {
-		destDir = filepath.Join(os.TempDir(), "dockpanel-backups")
+		if p := strings.TrimSpace(os.Getenv("DOCKPANEL_BACKUP_DIR")); p != "" {
+			destDir = p
+		} else {
+			destDir = filepath.Join(os.TempDir(), "dockwatch-backups")
+		}
 	}
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return nil, err
@@ -68,7 +72,10 @@ func BackupVolume(ctx context.Context, volumeName, destDir, dockerHost string) (
 }
 
 func backupVolumeSSH(ctx context.Context, dockerHost, volumeName string) (*Result, error) {
-	destDir := "/root/dockpanel-backups"
+	destDir := strings.TrimSpace(os.Getenv("DOCKPANEL_BACKUP_DIR"))
+	if destDir == "" {
+		destDir = "/var/lib/dockwatch/backups"
+	}
 	ts := time.Now().Format("20060102-150405")
 	safeName := strings.ReplaceAll(volumeName, "/", "_")
 	fileName := fmt.Sprintf("%s-%s.tar.gz", safeName, ts)
@@ -87,7 +94,7 @@ func backupVolumeSSH(ctx context.Context, dockerHost, volumeName string) (*Resul
 
 	return &Result{
 		VolumeName: volumeName,
-		BackupPath: remotePath + " (na VPS)",
+		BackupPath: remotePath + " (remoto)",
 		Duration:   time.Since(start).Round(time.Millisecond).String(),
 	}, nil
 }

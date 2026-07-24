@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,13 +11,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	cookieName     = "dockpanel_token"
-	defaultExpiry  = 7 * 24 * time.Hour
-	bcryptCost     = 12
+	cookieName    = "dockpanel_token"
+	defaultExpiry = 24 * time.Hour
 )
 
 var (
@@ -24,6 +23,7 @@ var (
 	ErrAuthDisabled       = errors.New("autenticação desabilitada")
 )
 
+// User is the single local admin (no multi-tenant / Postgres).
 type User struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
@@ -40,13 +40,19 @@ type Claims struct {
 }
 
 type Service struct {
-	Enabled bool
-	secret  []byte
-	store   *Store
+	Enabled  bool
+	secret   []byte
+	email    string
+	password string
+	name     string
 }
 
-func NewService(store *Store) (*Service, error) {
-	if store == nil {
+// NewService builds env-based single-admin auth.
+// Requires DOCKPANEL_ADMIN_EMAIL + DOCKPANEL_ADMIN_PASSWORD; otherwise Enabled=false.
+func NewService() (*Service, error) {
+	email := strings.TrimSpace(strings.ToLower(os.Getenv("DOCKPANEL_ADMIN_EMAIL")))
+	pass := os.Getenv("DOCKPANEL_ADMIN_PASSWORD")
+	if email == "" || pass == "" {
 		return &Service{Enabled: false}, nil
 	}
 	secret := os.Getenv("DOCKPANEL_JWT_SECRET")
@@ -58,32 +64,43 @@ func NewService(store *Store) (*Service, error) {
 		secret = base64.RawURLEncoding.EncodeToString(b)
 		fmt.Println("aviso: DOCKPANEL_JWT_SECRET não definido — usando segredo efêmero (reiniciar invalida sessões)")
 	}
-	return &Service{Enabled: true, secret: []byte(secret), store: store}, nil
+	name := strings.TrimSpace(os.Getenv("DOCKPANEL_ADMIN_NAME"))
+	if name == "" {
+		name = "Administrador"
+	}
+	return &Service{
+		Enabled:  true,
+		secret:   []byte(secret),
+		email:    email,
+		password: pass,
+		name:     name,
+	}, nil
 }
 
-func HashPassword(password string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
-	return string(b), err
+func (s *Service) AdminUser() User {
+	return User{ID: "admin", Email: s.email, Name: s.name, Role: "admin"}
 }
 
-func CheckPassword(hash, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+type LoginResult struct {
+	AccessToken string
+	User        User
 }
 
-func (s *Service) Login(email, password string) (token string, user User, err error) {
+func (s *Service) Login(email, password string) (LoginResult, error) {
 	if !s.Enabled {
-		return "", User{}, ErrAuthDisabled
+		return LoginResult{}, ErrAuthDisabled
 	}
 	email = strings.TrimSpace(strings.ToLower(email))
-	u, hash, err := s.store.FindByEmail(email)
+	if subtle.ConstantTimeCompare([]byte(email), []byte(s.email)) != 1 ||
+		subtle.ConstantTimeCompare([]byte(password), []byte(s.password)) != 1 {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	u := s.AdminUser()
+	access, err := s.sign(u)
 	if err != nil {
-		return "", User{}, ErrInvalidCredentials
+		return LoginResult{}, err
 	}
-	if !CheckPassword(hash, password) {
-		return "", User{}, ErrInvalidCredentials
-	}
-	token, err = s.sign(u)
-	return token, u, err
+	return LoginResult{AccessToken: access, User: u}, nil
 }
 
 func (s *Service) sign(u User) (string, error) {
@@ -123,6 +140,9 @@ func (s *Service) ParseToken(token string) (*Claims, error) {
 	return claims, nil
 }
 
-func CookieName() string { return cookieName }
+func (s *Service) UserFromClaims(c *Claims) User {
+	return User{ID: c.UserID, Email: c.Email, Name: c.Name, Role: c.Role}
+}
 
+func CookieName() string     { return cookieName }
 func TokenExpiry() time.Time { return time.Now().Add(defaultExpiry) }

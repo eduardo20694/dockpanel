@@ -44,11 +44,16 @@ export default function Security() {
         <PageHeader
           large
           title="Segurança"
-          description="Root, privileged, portas expostas, tags :latest e ausência de healthcheck."
-          badge={<span className="badge-critical tabular-nums">{rep?.criticalCount ?? 0} critical</span>}
+          description="Root, privileged, portas expostas, tags :latest e ausência de healthcheck. Score 0–100."
+          badge={
+            <span className="badge-critical tabular-nums">
+              score {rep?.securityScore ?? '—'} · {rep?.criticalCount ?? 0} critical
+            </span>
+          }
         />
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <MetricCard label="Security Score" value={rep?.securityScore ?? '—'} tone="brand" />
           <MetricCard label="Critical" value={rep?.criticalCount ?? 0} tone="danger" />
           <MetricCard label="Warning" value={rep?.warningCount ?? 0} tone="warning" />
           <MetricCard label="Tag :latest" value={rep?.latestTagCount ?? 0} tone="brand" />

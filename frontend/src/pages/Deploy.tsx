@@ -46,11 +46,12 @@ function kindLabel(kind: string) {
 }
 
 export default function Deploy() {
-  const { hostId, vpsLabel } = useHost()
+  const { hostId, hostLabel } = useHost()
   const [presets, setPresets] = useState<Preset[]>([])
   const [dockerHost, setDockerHost] = useState('')
-  const [projectPath, setProjectPath] = useState('/root/dockpanel')
+  const [projectPath, setProjectPath] = useState('')
   const [composeFile, setComposeFile] = useState('')
+  const [pathReady, setPathReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,9 +63,12 @@ export default function Deploy() {
   const [shallowDrift, setShallowDrift] = useState<any>(null)
   const [driftLoading, setDriftLoading] = useState(false)
   const firstLoad = useRef(true)
+  const pathTouched = useRef(false)
 
   useEffect(() => {
     firstLoad.current = true
+    pathTouched.current = false
+    setPathReady(false)
   }, [hostId])
 
   const loadPresets = useCallback(() => {
@@ -76,13 +80,17 @@ export default function Deploy() {
         setPresets(data.presets || [])
         setDockerHost(data.dockerHost || '')
         const preset = data.presets?.[0]
-        if (preset?.projectPath) {
+        if (preset?.projectPath && !pathTouched.current) {
           setProjectPath(preset.projectPath)
           setComposeFile(preset.composeFile || '')
         }
+        setPathReady(true)
         setError(null)
       })
-      .catch((e: Error) => setError(e.message))
+      .catch((e: Error) => {
+        setError(e.message)
+        setPathReady(true)
+      })
       .finally(() => {
         if (spin) {
           setLoading(false)
@@ -92,7 +100,10 @@ export default function Deploy() {
   }, [])
 
   const refreshStatus = useCallback(() => {
-    if (!projectPath.trim()) return
+    if (!pathReady || !projectPath.trim()) {
+      setServices([])
+      return
+    }
     setStatusLoading(true)
     api.deploy
       .status(projectPath)
@@ -102,10 +113,10 @@ export default function Deploy() {
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setStatusLoading(false))
-  }, [projectPath])
+  }, [pathReady, projectPath])
 
   usePoll(loadPresets, [hostId, loadPresets])
-  usePoll(refreshStatus, [hostId, projectPath, refreshStatus])
+  usePoll(refreshStatus, [hostId, pathReady, projectPath, refreshStatus])
 
   useEffect(() => {
     const preset = presets.find((p) => p.projectPath === projectPath)
@@ -165,7 +176,7 @@ export default function Deploy() {
         <PageHeader
           large
           title="Deploy"
-          description={`Orquestração completa de stacks na ${vpsLabel} — compose, status ao vivo, drift e logs.`}
+          description={`Orquestração de stacks em ${hostLabel} — compose, status ao vivo, drift e logs.`}
           badge={
             <span className={`badge ${runningCount === services.length && services.length > 0 ? 'badge-ok' : 'badge-warning'}`}>
               {services.length ? `${runningCount}/${services.length} serviços` : 'sem status'}
@@ -177,7 +188,7 @@ export default function Deploy() {
           <MetricCard label="Serviços ativos" value={runningCount} tone={runningCount > 0 ? 'success' : 'default'} sub={`de ${services.length || '—'} total`} />
           <MetricCard label="Drift detectado" value={driftCount} tone={driftCount > 0 ? 'danger' : 'success'} sub={driftCount > 0 ? 'compose ≠ running' : 'alinhado'} />
           <MetricCard label="Compose file" value={composeFile || '—'} tone="brand" sub="arquivo detectado" />
-          <MetricCard label="Host Docker" value={dockerHost.includes('ssh://') ? 'SSH' : dockerHost ? 'Remoto' : 'Local'} tone="default" sub={dockerHost || vpsLabel} />
+          <MetricCard label="Host Docker" value={dockerHost.includes('ssh://') ? 'SSH' : dockerHost ? 'Remoto' : 'Local'} tone="default" sub={dockerHost || hostLabel} />
         </div>
 
         {error && (
@@ -193,11 +204,19 @@ export default function Deploy() {
               <input
                 type="text"
                 value={projectPath}
-                onChange={(e) => setProjectPath(e.target.value)}
+                onChange={(e) => {
+                  pathTouched.current = true
+                  setProjectPath(e.target.value)
+                }}
                 className="input-field font-mono text-sm"
-                placeholder="/root/dockpanel"
+                placeholder="pasta com docker-compose.yml (ex.: /opt/app)"
               />
             </label>
+            {!projectPath.trim() && (
+              <p className="mt-2 text-xs text-text-muted">
+                Defina o caminho acima ou a env <span className="font-mono">DOCKPANEL_COMPOSE_PATH</span>.
+              </p>
+            )}
             {presets.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {presets.map((p) => (

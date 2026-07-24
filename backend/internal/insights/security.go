@@ -24,6 +24,7 @@ type SecurityReport struct {
 	CriticalCount  int       `json:"criticalCount"`
 	WarningCount   int       `json:"warningCount"`
 	LatestTagCount int       `json:"latestTagCount"`
+	SecurityScore  int       `json:"securityScore"`
 	Findings       []Finding `json:"findings"`
 }
 
@@ -91,5 +92,18 @@ func Audit(ctx context.Context, cli *client.Client, hostID, hostLabel string) (*
 			add("info", "no_healthcheck", "sem healthcheck definido — falhas silenciosas são mais difíceis de detectar")
 		}
 	}
+	report.SecurityScore = ComputeScore(report.CriticalCount, report.WarningCount, report.LatestTagCount)
 	return report, nil
+}
+
+// ComputeScore returns 0–100 (100 = healthy).
+func ComputeScore(critical, warning, latest int) int {
+	score := 100 - critical*20 - warning*5 - latest*2
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
 }

@@ -50,7 +50,7 @@ export default function Stacks() {
         />
 
         {stacks.length === 0 && (
-          <EmptyState title="Nenhum projeto detectado" description="Nenhum container com label compose nesta VPS." />
+          <EmptyState title="Nenhum projeto detectado" description="Nenhum container com label compose neste host." />
         )}
 
         <div className="space-y-2">

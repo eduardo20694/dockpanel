@@ -56,19 +56,52 @@ type Preset struct {
 	ComposeFile string `json:"composeFile"`
 }
 
-// Presets devolve projetos compose conhecidos (path via env ou padrão).
-func Presets() []Preset {
-	path := os.Getenv("DOCKPANEL_COMPOSE_PATH")
-	if path == "" {
-		path = `c:\Github\dockpanel`
+// DefaultComposePath devolve a pasta do compose (env ou descoberta a partir do cwd).
+// Não usa path hardcoded — evita 502 em máquinas sem /root/dockpanel.
+func DefaultComposePath() string {
+	if p := strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH")); p != "" {
+		return p
 	}
-	compose, _ := findComposeFile(path)
-	if compose == "" {
+	return discoverComposePath()
+}
+
+// discoverComposePath sobe a partir do cwd até achar docker-compose.yml / compose.yml.
+func discoverComposePath() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	dir := wd
+	for i := 0; i < 8; i++ {
+		if name, err := findComposeFile(dir); err == nil && name != "" {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
+// Presets devolve projetos compose conhecidos (path via env ou descoberta).
+func Presets() []Preset {
+	path := DefaultComposePath()
+	if path == "" {
 		return nil
 	}
+	compose, err := findComposeFile(path)
+	if err != nil || compose == "" {
+		return nil
+	}
+	name := filepath.Base(path)
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		name = "compose"
+	}
 	return []Preset{{
-		ID:          "dockpanel",
-		Name:        "dockpanel",
+		ID:          "default",
+		Name:        name,
 		ProjectPath: path,
 		ComposeFile: compose,
 	}}

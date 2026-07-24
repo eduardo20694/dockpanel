@@ -49,15 +49,21 @@ export function Card({
   hover,
   glow,
   bordered = true,
+  onClick,
 }: {
   children: ReactNode
   className?: string
   hover?: boolean
   glow?: boolean
   bordered?: boolean
+  onClick?: () => void
 }) {
   const base = glow ? 'card-glow' : hover ? 'card-hover' : bordered ? 'card-bordered' : 'card'
-  return <div className={`${base} ${className}`}>{children}</div>
+  return (
+    <div className={`${base} ${className}`} onClick={onClick} role={onClick ? 'button' : undefined}>
+      {children}
+    </div>
+  )
 }
 
 export function MetricCard({

@@ -1,0 +1,19 @@
+---
+description: Padrões do backend Go do dockpanel (painel Docker self-hosted)
+globs: backend/**/*.go
+alwaysApply: false
+---
+
+Contexto de arquitetura (backend Go):
+- `internal/dockerclient` — pool multi-host via DOCKPANEL_HOSTS, reaproveitado por API REST e MCP
+- `internal/diagnostics` — motor de diagnóstico (exit code + OOM + eventos + logs)
+- `internal/auth` — admin único via env + JWT (sem Postgres)
+- `internal/store` — histórico JSONL em DOCKPANEL_DATA_DIR
+- `cmd/mcp` — servidor MCP local (stdio)
+
+Ao adicionar endpoint novo:
+1. Exija auth se mutar recursos Docker (middleware já cobre rotas não-públicas).
+2. Resolva host só via header `X-Dockpanel-Host` / query `host` contra o pool env.
+3. Prefira menos mudança; não reintroduza multi-tenancy/Postgres.
+
+Ao tocar em `internal/auth` ou `cmd/server`: trate como código de alto risco.

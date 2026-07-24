@@ -1,36 +1,36 @@
+# Segredos vêm do .env / Environment do Portainer — nada de senha aqui.
+# Imagem fixa: build+push no PC → pull na VPS.
 services:
   dockpanel:
-    image: redecoop/dockpanel:${VERSION:-0.0.1}
-    container_name: dockpanel
+    image: redecoop/dockwatch:1.0.0
+    container_name: dockwatch
     restart: unless-stopped
     ports:
       - "8083:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dockpanel-data:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ${DOCKPANEL_PROJECT_DIR:-.}:/opt/dockpanel:ro
     environment:
-      - PORT=8080
-      - DOCKPANEL_DATA_DIR=/data
-      - DOCKPANEL_HOSTS=${DOCKPANEL_HOSTS}
-      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-dockpanel}
-      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
-      - DOCKPANEL_JWT_SECRET=${DOCKPANEL_JWT_SECRET}
+      PORT: "8080"
+      DOCKPANEL_DATA_DIR: /data
+      DOCKPANEL_HOSTS: ${DOCKPANEL_HOSTS}
+      DOCKPANEL_COMPOSE_PATH: ${DOCKPANEL_COMPOSE_PATH:-/opt/dockpanel}
+      DOCKPANEL_BACKUP_DIR: ${DOCKPANEL_BACKUP_DIR:-/data/backups}
+      DOCKPANEL_JWT_SECRET: ${DOCKPANEL_JWT_SECRET}
+      DOCKPANEL_ADMIN_EMAIL: ${DOCKPANEL_ADMIN_EMAIL}
+      DOCKPANEL_ADMIN_PASSWORD: ${DOCKPANEL_ADMIN_PASSWORD}
+      DOCKPANEL_ADMIN_NAME: ${DOCKPANEL_ADMIN_NAME:-Administrador}
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 0.5
     networks:
-      - default
+      - dockpanel
 
 networks:
-  default:
-    name: bridge
-    external: true
+  dockpanel:
+    name: dockpanel
+    driver: bridge
 
 volumes:
   dockpanel-data:

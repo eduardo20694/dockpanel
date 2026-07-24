@@ -144,12 +144,32 @@ func TestPresetsWithCompose(t *testing.T) {
 	if presets[0].ComposeFile != "docker-compose.yml" {
 		t.Fatalf("compose file %q", presets[0].ComposeFile)
 	}
+	if presets[0].ProjectPath != dir {
+		t.Fatalf("path %q", presets[0].ProjectPath)
+	}
 }
 
 func TestPresetsEmptyWhenNoCompose(t *testing.T) {
 	t.Setenv("DOCKPANEL_COMPOSE_PATH", t.TempDir())
 	if presets := Presets(); len(presets) != 0 {
 		t.Fatalf("expected no presets, got %v", presets)
+	}
+}
+
+func TestDefaultComposePathEnv(t *testing.T) {
+	dir := composeProjectDir(t)
+	t.Setenv("DOCKPANEL_COMPOSE_PATH", dir)
+	if got := DefaultComposePath(); got != dir {
+		t.Fatalf("got %q want %q", got, dir)
+	}
+}
+
+func TestResolveComposePathLocalUsesDefault(t *testing.T) {
+	dir := composeProjectDir(t)
+	t.Setenv("DOCKPANEL_COMPOSE_PATH", dir)
+	got := ResolveComposePath("", "")
+	if got != dir {
+		t.Fatalf("got %q", got)
 	}
 }
 
