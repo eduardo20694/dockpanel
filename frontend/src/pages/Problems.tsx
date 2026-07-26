@@ -106,6 +106,13 @@ export default function Problems() {
                   <div className="text-xs text-text-faint font-mono mt-2 tabular-nums">
                     {p.state} · exit {p.exitCode} · {p.restartCount} restarts
                   </div>
+                  <Link
+                    to={`/logs?container=${encodeURIComponent(p.name)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs text-accent hover:underline mt-2 inline-block"
+                  >
+                    Ver histórico completo no Log Center →
+                  </Link>
                 </button>
               ))}
             </div>
@@ -134,15 +141,15 @@ export default function Problems() {
                   )}
                   <Block title="Recomendação">
                     <p className="text-sm text-text-secondary">{diagnosis.recommendation}</p>
-                    <div className="flex flex-wrap gap-3 mt-2">
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-3">
                       <Link to={`/investigate/${diagnosis.containerId}`} className="link text-sm font-medium">
                         Investigação completa →
                       </Link>
                       <Link
                         to={`/logs?container=${encodeURIComponent(diagnosis.name || diagnosis.containerId)}`}
-                        className="link text-sm font-medium"
+                        className="btn-outline btn-sm inline-flex items-center justify-center"
                       >
-                        Histórico no Log Center →
+                        Ver histórico completo no Log Center
                       </Link>
                     </div>
                   </Block>

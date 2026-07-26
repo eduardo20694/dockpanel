@@ -3,7 +3,7 @@
 
 services:
   dockpanel:
-    image: redecoop/dockwatch:1.0.3
+    image: redecoop/dockwatch:1.0.4
     container_name: dockwatch
     restart: unless-stopped
     ports:
