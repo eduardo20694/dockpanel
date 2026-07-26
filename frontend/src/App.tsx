@@ -22,6 +22,7 @@ import Investigate from './pages/Investigate'
 import Cleanup from './pages/Cleanup'
 import Alerts from './pages/Alerts'
 import Metrics from './pages/Metrics'
+import LogCenter from './pages/LogCenter'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, retry: 1 } },
@@ -84,6 +85,7 @@ function AppRoutes() {
         <Route path="/cleanup" element={<Cleanup />} />
         <Route path="/deploy" element={<Deploy />} />
         <Route path="/metrics" element={<Metrics />} />
+        <Route path="/logs" element={<LogCenter />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

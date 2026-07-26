@@ -33,7 +33,7 @@ export default function Alerts() {
         <div className="mb-6">
           <h1 className="font-display font-bold text-2xl text-text">Alertas</h1>
           <p className="text-text-muted text-sm mt-1">
-            Histórico local de eventos críticos. Notificações externas (Telegram/Discord) são opcionais via ALERT_* no .env.
+            Histórico local (critical + warning) e digest diário. Telegram/Discord via ALERT_* — no bot: /metric e /problems.
           </p>
         </div>
 
@@ -42,7 +42,7 @@ export default function Alerts() {
             <ul className="divide-y divide-border">
               {history.length === 0 ? (
                 <li className="p-4 text-text-muted text-sm">
-                  Nenhum alerta ainda. O scanner grava problemas critical automaticamente a cada poucos minutos.
+                  Nenhum alerta ainda. O scanner grava critical e warning a cada poucos minutos.
                 </li>
               ) : (
                 history.map((a, i) => (

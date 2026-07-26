@@ -50,12 +50,19 @@ func (n *Notifier) Enabled() bool {
 		(n.whatsappURL != "" && n.whatsappToken != "")
 }
 
-func (n *Notifier) SendCritical(title, body string) error {
-	return n.SendChannels(title, body, nil)
+func (n *Notifier) TelegramConfigured() bool {
+	return n.telegramToken != "" && n.telegramChatID != ""
 }
 
-// SendChannels sends to requested channels (empty = all configured).
-func (n *Notifier) SendChannels(title, body string, channels []string) error {
+func (n *Notifier) TelegramToken() string  { return n.telegramToken }
+func (n *Notifier) TelegramChatID() string { return n.telegramChatID }
+
+func (n *Notifier) SendCritical(title, body string) error {
+	return n.SendSeverity("critical", title, body, nil)
+}
+
+// SendSeverity sends to requested channels (empty = all configured).
+func (n *Notifier) SendSeverity(severity, title, body string, channels []string) error {
 	want := func(name string) bool {
 		if len(channels) == 0 {
 			return true
@@ -67,7 +74,7 @@ func (n *Notifier) SendChannels(title, body string, channels []string) error {
 		}
 		return false
 	}
-	msg := fmt.Sprintf("🔴 *%s*\n\n%s", escapeMarkdown(title), escapeMarkdown(body))
+	msg := formatAlertMessage(severity, title, body)
 	var errs []string
 	if want("telegram") && n.telegramToken != "" && n.telegramChatID != "" {
 		if err := n.sendTelegram(msg); err != nil {
@@ -95,14 +102,79 @@ func (n *Notifier) SendChannels(title, body string, channels []string) error {
 	return nil
 }
 
+// SendChannels keeps the old API (treated as critical styling).
+func (n *Notifier) SendChannels(title, body string, channels []string) error {
+	return n.SendSeverity("critical", title, body, channels)
+}
+
+// SendTelegramText sends a plain-text Telegram message (no Markdown).
+func (n *Notifier) SendTelegramText(text string) error {
+	if !n.TelegramConfigured() {
+		return fmt.Errorf("telegram não configurado")
+	}
+	return n.sendTelegramPlain(n.telegramChatID, text)
+}
+
+// SendTelegramTo sends plain text to a specific chat id.
+func (n *Notifier) SendTelegramTo(chatID, text string) error {
+	if n.telegramToken == "" {
+		return fmt.Errorf("telegram token ausente")
+	}
+	return n.sendTelegramPlain(chatID, text)
+}
+
+func formatAlertMessage(severity, title, body string) string {
+	label := "Info"
+	switch strings.ToLower(severity) {
+	case "critical":
+		label = "Critical"
+	case "warning":
+		label = "Warning"
+	case "daily", "digest":
+		label = "Resumo diário"
+	}
+	return fmt.Sprintf("%s\n\n%s\n\n%s", label, title, body)
+}
+
+// SendTelegramHTML sends an HTML-formatted Telegram message to the configured chat.
+func (n *Notifier) SendTelegramHTML(html string) error {
+	if !n.TelegramConfigured() {
+		return fmt.Errorf("telegram não configurado")
+	}
+	return n.postTelegram(n.telegramChatID, html, "HTML")
+}
+
+// SendTelegramToHTML sends HTML to a specific chat id.
+func (n *Notifier) SendTelegramToHTML(chatID, html string) error {
+	if n.telegramToken == "" {
+		return fmt.Errorf("telegram token ausente")
+	}
+	return n.postTelegram(chatID, html, "HTML")
+}
+
 func (n *Notifier) sendTelegram(text string) error {
+	// Prefer HTML when the payload already contains tags; otherwise plain.
+	if strings.Contains(text, "<b>") || strings.Contains(text, "<i>") || strings.Contains(text, "<code>") {
+		return n.postTelegram(n.telegramChatID, text, "HTML")
+	}
+	return n.sendTelegramPlain(n.telegramChatID, text)
+}
+
+func (n *Notifier) sendTelegramPlain(chatID, text string) error {
+	return n.postTelegram(chatID, text, "")
+}
+
+func (n *Notifier) postTelegram(chatID, text, parseMode string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.telegramToken)
-	payload, _ := json.Marshal(map[string]interface{}{
-		"chat_id":    n.telegramChatID,
-		"text":       text,
-		"parse_mode": "Markdown",
-	})
-	resp, err := n.http.Post(url, "application/json", bytes.NewReader(payload))
+	payload := map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+	}
+	if parseMode != "" {
+		payload["parse_mode"] = parseMode
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := n.http.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -154,11 +226,10 @@ func (n *Notifier) sendEmail(title, body string) error {
 }
 
 func (n *Notifier) sendWhatsApp(title, body string) error {
-	// Generic WhatsApp Business / Cloud API style stub
 	payload, _ := json.Marshal(map[string]interface{}{
-		"to":      n.whatsappTo,
-		"type":    "text",
-		"text":    map[string]string{"body": title + "\n\n" + body},
+		"to":                n.whatsappTo,
+		"type":              "text",
+		"text":              map[string]string{"body": title + "\n\n" + body},
 		"messaging_product": "whatsapp",
 	})
 	req, err := http.NewRequest(http.MethodPost, n.whatsappURL, bytes.NewReader(payload))
@@ -176,9 +247,4 @@ func (n *Notifier) sendWhatsApp(title, body string) error {
 		return fmt.Errorf("whatsapp HTTP %d", resp.StatusCode)
 	}
 	return nil
-}
-
-func escapeMarkdown(s string) string {
-	replacer := strings.NewReplacer("_", "\\_", "*", "\\*", "[", "\\[", "`", "\\`")
-	return replacer.Replace(s)
 }

@@ -14,8 +14,10 @@ import (
 	"dockpanel/internal/auth"
 	"dockpanel/internal/collector"
 	"dockpanel/internal/dockerclient"
+	"dockpanel/internal/logcenter"
 	"dockpanel/internal/observability"
 	"dockpanel/internal/store"
+	"dockpanel/internal/telegram"
 
 	"github.com/joho/godotenv"
 )
@@ -79,11 +81,22 @@ func main() {
 		log.Printf("auth: desabilitado (defina DOCKPANEL_ADMIN_EMAIL e DOCKPANEL_ADMIN_PASSWORD)")
 	}
 
-	alerts.NewScanner(pool, alerts.NewFromEnv(), st).Start(ctx)
+	notifier := alerts.NewFromEnv()
+	alerts.NewScanner(pool, notifier, st).Start(ctx)
+	telegram.NewFromEnv(pool, notifier).Start(ctx)
 	collector.New(pool, st).Start(ctx)
 
+	var logStore *logcenter.Store
+	if ls, err := logcenter.Open(""); err != nil {
+		log.Printf("aviso: log center desabilitado: %v", err)
+	} else {
+		logStore = ls
+		logcenter.NewCollector(pool, logStore).Start(ctx)
+		defer logStore.Close()
+	}
+
 	server := api.NewServerFromDeps(api.Deps{
-		Hosts: pool, Store: st, Auth: authSvc,
+		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
 	})
 
 	port := os.Getenv("PORT")

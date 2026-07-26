@@ -22,13 +22,16 @@ FROM nginx:1.27-alpine
 # Docker CLI + compose plugin: tela Deploy via socket montado
 # Trivy: scan de imagens
 ARG COMPOSE_VERSION=2.32.4
-RUN apk add --no-cache ca-certificates curl docker-cli \
+ENV TZ=America/Sao_Paulo
+RUN apk add --no-cache ca-certificates curl docker-cli tzdata \
  && mkdir -p /usr/local/lib/docker/cli-plugins \
  && curl -fsSL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
       -o /usr/local/lib/docker/cli-plugins/docker-compose \
  && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose \
  && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin \
- && apk del curl
+ && apk del curl \
+ && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+ && echo $TZ > /etc/timezone
 COPY --from=backend-build /dockpanel /usr/local/bin/dockpanel
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

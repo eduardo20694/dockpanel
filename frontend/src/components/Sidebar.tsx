@@ -12,6 +12,7 @@ const groups = [
       { to: '/security', label: 'Segurança', icon: ShieldIcon },
       { to: '/alerts', label: 'Alertas', icon: BellIcon },
       { to: '/metrics', label: 'Métricas', icon: ChartIcon },
+      { to: '/logs', label: 'Logs', icon: LogIcon },
     ],
   },
   {
@@ -217,6 +218,13 @@ function BellIcon({ active }: { active: boolean }) {
   return (
     <svg className={iconCls(active)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
       <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+    </svg>
+  )
+}
+function LogIcon({ active }: { active: boolean }) {
+  return (
+    <svg className={iconCls(active)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2" strokeLinecap="round" />
     </svg>
   )
 }

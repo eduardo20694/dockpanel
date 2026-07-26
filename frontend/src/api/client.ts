@@ -110,6 +110,40 @@ export const api = {
     driftDeep: (path: string) => request<any>(`/system/drift/deep?path=${encodeURIComponent(path)}`),
     alerts: () => request<any[]>('/history/alerts'),
   },
+  logs: {
+    search: (opts?: {
+      q?: string
+      container?: string
+      severity?: string
+      from?: number
+      to?: number
+      limit?: number
+      cursor?: string
+    }) => {
+      const q = new URLSearchParams()
+      if (opts?.q) q.set('q', opts.q)
+      if (opts?.container) q.set('container', opts.container)
+      if (opts?.severity) q.set('severity', opts.severity)
+      if (opts?.from) q.set('from', String(opts.from))
+      if (opts?.to) q.set('to', String(opts.to))
+      if (opts?.limit) q.set('limit', String(opts.limit))
+      if (opts?.cursor) q.set('cursor', opts.cursor)
+      return request<{ entries: any[]; nextCursor?: string }>(`/logs/search?${q}`)
+    },
+    incidents: (opts?: { from?: number; to?: number; window?: string }) => {
+      const q = new URLSearchParams()
+      if (opts?.from) q.set('from', String(opts.from))
+      if (opts?.to) q.set('to', String(opts.to))
+      if (opts?.window) q.set('window', opts.window)
+      return request<{ incidents: any[] }>(`/logs/incidents?${q}`)
+    },
+    retention: () => request<{ days: number; maxDays: number }>('/logs/retention'),
+    setRetention: (days: number) =>
+      request<{ days: number; maxDays: number }>('/logs/retention', {
+        method: 'PUT',
+        body: JSON.stringify({ days }),
+      }),
+  },
   diagnostics: {
     diagnose: (id: string) => request<any>(`/containers/${id}/diagnose`),
   },

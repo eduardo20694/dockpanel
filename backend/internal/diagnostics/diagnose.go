@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"time"
 
@@ -19,18 +18,6 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"
 )
-
-// errorPatterns são os sinais textuais mais comuns de problema em logs
-// de aplicação, cobrindo várias linguagens/runtimes comuns.
-var errorPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)\b(error|erro|fatal|panic|exception|traceback|segfault)\b`),
-	regexp.MustCompile(`(?i)\bconnection refused\b`),
-	regexp.MustCompile(`(?i)\baddress already in use\b`),
-	regexp.MustCompile(`(?i)\bout of memory\b`),
-	regexp.MustCompile(`(?i)\bpermission denied\b`),
-	regexp.MustCompile(`(?i)\btimeout\b`),
-	regexp.MustCompile(`(?i)\b(econnrefused|enotfound|eaddrinuse)\b`),
-}
 
 type Severity string
 
@@ -155,11 +142,8 @@ func (e *Engine) tailErrorLogs(ctx context.Context, id string, tail int) ([]stri
 		if line == "" {
 			continue
 		}
-		for _, p := range errorPatterns {
-			if p.MatchString(line) {
-				matches = append(matches, line)
-				break
-			}
+		if LogLineLooksLikeError(line) {
+			matches = append(matches, line)
 		}
 	}
 	if len(matches) > 20 {

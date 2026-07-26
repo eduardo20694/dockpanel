@@ -1,15 +1,16 @@
 # Segredos vêm do .env / Environment do Portainer — nada de senha aqui.
+# Nome do serviço e rede alinhados com a stack Portainer (dockepanel).
 
 services:
-  dockwatch:
-    image: redecoop/dockwatch:1.0.0
+  dockpanel:
+    image: redecoop/dockwatch:1.0.3
     container_name: dockwatch
     restart: unless-stopped
     ports:
       - "8083:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dockwatch-data:/data
+      - dockpanel-data:/data
       - ${DOCKPANEL_PROJECT_DIR:-.}:/opt/dockpanel:ro
     environment:
       PORT: "8080"
@@ -21,16 +22,22 @@ services:
       DOCKPANEL_ADMIN_EMAIL: ${DOCKPANEL_ADMIN_EMAIL}
       DOCKPANEL_ADMIN_PASSWORD: ${DOCKPANEL_ADMIN_PASSWORD}
       DOCKPANEL_ADMIN_NAME: ${DOCKPANEL_ADMIN_NAME:-Administrador}
+      TZ: ${TZ:-America/Sao_Paulo}
+      DOCKPANEL_LOG_RETENTION_DAYS: ${DOCKPANEL_LOG_RETENTION_DAYS:-60}
+      ALERT_TELEGRAM_BOT_TOKEN: ${ALERT_TELEGRAM_BOT_TOKEN}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID}
+      ALERT_DAILY_HOUR: ${ALERT_DAILY_HOUR:-9}
+      ALERT_DISCORD_WEBHOOK: ${ALERT_DISCORD_WEBHOOK}
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 0.5
     networks:
-      - dockwatch
+      - dockpanel
 
 networks:
-  dockwatch:
-    name: dockwatch
+  dockpanel:
+    name: dockpanel
     driver: bridge
 
 volumes:
-  dockwatch-data:
+  dockpanel-data:

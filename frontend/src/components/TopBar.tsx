@@ -17,6 +17,7 @@ const titles: Record<string, string> = {
   '/deploy': 'Deploy',
   '/alerts': 'Alertas',
   '/metrics': 'Métricas',
+  '/logs': 'Log Center',
   '/cleanup': 'Limpeza',
 }
 

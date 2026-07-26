@@ -132,7 +132,8 @@ cd frontend; npm run build
 | `DOCKPANEL_PROJECT_DIR` | | Path no host montado no container |
 | `DOCKPANEL_BACKUP_DIR` | | Destino de backup de volumes |
 | `DOCKPANEL_COMPOSE_PATH_REMOTE` | | Compose em host `ssh://` (MCP / avançado) |
-| `ALERT_TELEGRAM_BOT_TOKEN` / `CHAT_ID` | | Alertas Telegram |
+| `ALERT_TELEGRAM_BOT_TOKEN` / `CHAT_ID` | | Alertas + bot (`/metric`, `/problems`) |
+| `ALERT_DAILY_HOUR` | | Hora local do resumo diário (padrão `9`) |
 | `ALERT_DISCORD_WEBHOOK` | | Alertas Discord |
 
 \*Se omitido, a API sobe um host local padrão a partir de `DOCKER_HOST` / socket.

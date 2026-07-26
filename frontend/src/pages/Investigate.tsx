@@ -56,6 +56,12 @@ export default function Investigate() {
         <Link to="/containers" className="text-xs text-text-muted hover:text-text mb-5 inline-block">
           ← Containers
         </Link>
+        <Link
+          to={`/logs?container=${encodeURIComponent(d.name || id || '')}`}
+          className="text-xs text-accent hover:underline mb-5 ml-4 inline-block"
+        >
+          Ver histórico no Log Center →
+        </Link>
 
         <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b border-border">
           <div>

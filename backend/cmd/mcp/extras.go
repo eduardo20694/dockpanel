@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"dockpanel/internal/backup"
 	"dockpanel/internal/deploy"
 	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/drift"
 	"dockpanel/internal/dockerclient"
+	"dockpanel/internal/drift"
 	"dockpanel/internal/insights"
+	"dockpanel/internal/logcenter"
 	"dockpanel/internal/scan"
 	"dockpanel/internal/stacks"
 
@@ -309,4 +312,77 @@ func registerDeepDriftTool(s *server.MCPServer, pool *dockerclient.Pool) {
 		}
 		return mcp.NewToolResultText(sb.String()), nil
 	})
+}
+
+func registerSearchLogs(s *server.MCPServer) {
+	tool := mcp.NewTool("search_logs",
+		mcp.WithDescription("Busca no Log Center (histórico SQLite de todos os containers). Útil para 'o que aconteceu ontem com o container X?'."),
+		mcp.WithString("q", mcp.Description("texto livre (FTS5)")),
+		mcp.WithString("container", mcp.Description("filtro por nome ou id")),
+		mcp.WithString("severity", mcp.Description("ok | warning | critical")),
+		mcp.WithString("from", mcp.Description("início RFC3339 ou unix ms")),
+		mcp.WithString("to", mcp.Description("fim RFC3339 ou unix ms")),
+		mcp.WithString("limit", mcp.Description("máx linhas (padrão 50)")),
+	)
+	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		st, err := logcenter.Open("")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		defer st.Close()
+
+		limit := 50
+		if v := strings.TrimSpace(req.GetString("limit", "")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				limit = n
+			}
+		}
+		fromMs := parseTimeArg(req.GetString("from", ""))
+		toMs := parseTimeArg(req.GetString("to", ""))
+		if toMs == 0 {
+			toMs = time.Now().UnixMilli()
+		}
+		if fromMs == 0 {
+			fromMs = toMs - int64(24*time.Hour/time.Millisecond)
+		}
+
+		res, err := st.Search(logcenter.SearchParams{
+			Query:     req.GetString("q", ""),
+			Container: req.GetString("container", ""),
+			Severity:  req.GetString("severity", ""),
+			FromMs:    fromMs,
+			ToMs:      toMs,
+			Limit:     limit,
+		})
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		if len(res.Entries) == 0 {
+			return mcp.NewToolResultText("Nenhuma linha encontrada."), nil
+		}
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "%d linha(s):\n\n", len(res.Entries))
+		for _, e := range res.Entries {
+			ts := time.UnixMilli(e.TimestampMs).Local().Format("02/01 15:04:05")
+			fmt.Fprintf(&sb, "[%s] %s %s · %s\n  %s\n\n", e.Severity, ts, e.ContainerName, e.Stream, e.Message)
+		}
+		return mcp.NewToolResultText(sb.String()), nil
+	})
+}
+
+func parseTimeArg(v string) int64 {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if n < 1e12 {
+			return n * 1000
+		}
+		return n
+	}
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return t.UnixMilli()
+	}
+	return 0
 }

@@ -64,6 +64,7 @@ func main() {
 	registerExecutiveTool(s, pool)
 	registerSecurityAuditTool(s, pool)
 	registerDeepDriftTool(s, pool)
+	registerSearchLogs(s)
 
 	if err := server.ServeStdio(s); err != nil {
 		log.Fatalf("erro no servidor MCP: %v", err)

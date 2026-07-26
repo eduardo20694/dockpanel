@@ -8,6 +8,7 @@ import (
 
 	"dockpanel/internal/auth"
 	"dockpanel/internal/dockerclient"
+	"dockpanel/internal/logcenter"
 	"dockpanel/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -16,21 +17,23 @@ import (
 )
 
 type Server struct {
-	Hosts  *dockerclient.Pool
-	Store  *store.Store
-	Auth   *auth.Service
-	Router *chi.Mux
+	Hosts    *dockerclient.Pool
+	Store    *store.Store
+	LogStore *logcenter.Store
+	Auth     *auth.Service
+	Router   *chi.Mux
 }
 
 type Deps struct {
-	Hosts *dockerclient.Pool
-	Store *store.Store
-	Auth  *auth.Service
+	Hosts    *dockerclient.Pool
+	Store    *store.Store
+	LogStore *logcenter.Store
+	Auth     *auth.Service
 }
 
 func NewServerFromDeps(d Deps) *Server {
 	s := &Server{
-		Hosts: d.Hosts, Store: d.Store, Auth: d.Auth,
+		Hosts: d.Hosts, Store: d.Store, LogStore: d.LogStore, Auth: d.Auth,
 		Router: chi.NewRouter(),
 	}
 	s.routes()
@@ -84,6 +87,13 @@ func (s *Server) routes() {
 	r.Get("/api/deploy/presets", s.deployPresets)
 	r.Post("/api/deploy/compose", s.deployComposeAudited)
 	r.Get("/api/deploy/compose/status", s.deployComposeStatus)
+
+	r.Route("/api/logs", func(r chi.Router) {
+		r.Get("/search", s.searchLogs)
+		r.Get("/incidents", s.listLogIncidents)
+		r.Get("/retention", s.getLogRetention)
+		r.Put("/retention", s.putLogRetention)
+	})
 
 	r.Route("/api/containers", func(r chi.Router) {
 		r.Get("/", s.listContainers)

@@ -134,9 +134,17 @@ export default function Problems() {
                   )}
                   <Block title="Recomendação">
                     <p className="text-sm text-text-secondary">{diagnosis.recommendation}</p>
-                    <Link to={`/investigate/${diagnosis.containerId}`} className="link text-sm font-medium mt-2 inline-block">
-                      Investigação completa →
-                    </Link>
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      <Link to={`/investigate/${diagnosis.containerId}`} className="link text-sm font-medium">
+                        Investigação completa →
+                      </Link>
+                      <Link
+                        to={`/logs?container=${encodeURIComponent(diagnosis.name || diagnosis.containerId)}`}
+                        className="link text-sm font-medium"
+                      >
+                        Histórico no Log Center →
+                      </Link>
+                    </div>
                   </Block>
                 </div>
               )}
