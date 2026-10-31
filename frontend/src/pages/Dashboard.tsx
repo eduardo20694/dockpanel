@@ -54,7 +54,7 @@ export default function Dashboard() {
     <PageShell>
       <PageInner wide>
         {/* Hero */}
-        <div className="hero-banner animate-slide-up">
+        <div className="hero-banner">
           <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-3">

@@ -111,14 +111,20 @@ async function useTheme(page: Page, theme: 'light' | 'dark') {
 
 const tour: [string, string, string][] = [
   ['/', 'Produção', 'dashboard'],
-  ['/containers', 'Containers', 'containers'],
-  ['/stacks', 'Stacks', 'stacks'],
-  ['/problems', 'Erros & diagnóstico', 'problems'],
   ['/broke', 'Algo quebrou', 'broke'],
-  ['/investigate/abc', 'api', 'investigate'],
+  ['/problems', 'Erros & diagnóstico', 'problems'],
+  ['/stacks', 'Stacks', 'stacks'],
   ['/security', 'Segurança', 'security'],
-  ['/logs', 'Log Center', 'logs'],
   ['/alerts', 'Alertas', 'alerts'],
+  ['/metrics', 'Métricas', 'metrics'],
+  ['/logs', 'Log Center', 'logs'],
+  ['/containers', 'Containers', 'containers'],
+  ['/investigate/abc', 'api', 'investigate'],
+  ['/images', 'Imagens', 'images'],
+  ['/volumes', 'Volumes', 'volumes'],
+  ['/networks', 'Redes', 'networks'],
+  ['/cleanup', 'Limpeza', 'cleanup'],
+  ['/deploy', 'Deploy', 'deploy'],
   ['/settings', 'Organização', 'settings'],
 ]
 
@@ -156,6 +162,7 @@ test('tema segue o sistema, persiste e troca pela paleta', async ({ page }) => {
 })
 
 test('telas principais nos dois temas', async ({ page }) => {
+  test.setTimeout(120_000)
   await mockApi(page)
   await useTheme(page, 'dark')
   for (const [href, heading, file] of tour) {

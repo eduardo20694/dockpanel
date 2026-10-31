@@ -6,7 +6,7 @@ export function PageShell({ children }: { children: ReactNode }) {
 
 export function PageInner({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
-    <div className={`page-inner animate-slide-up ${wide ? 'max-w-[1320px]' : ''}`}>{children}</div>
+    <div className={`page-inner ${wide ? 'max-w-[1320px]' : ''}`}>{children}</div>
   )
 }
 
@@ -28,13 +28,13 @@ export function PageHeader({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className={`font-display font-bold tracking-tight text-text ${large ? 'text-3xl' : 'text-2xl'}`}>
+            <h1 className={`font-display font-bold tracking-tight text-text ${large ? 'text-4xl' : 'text-3xl'}`}>
               {title}
             </h1>
             {badge}
           </div>
           {description && (
-            <p className="text-[15px] text-text-muted leading-relaxed max-w-2xl">{description}</p>
+            <p className="text-[15px] font-medium text-text-secondary leading-relaxed max-w-2xl">{description}</p>
           )}
         </div>
         {action}
