@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { prefGet, prefSet } from '../lib/prefs'
-
-export type Theme = 'dark' | 'light'
+import { resolveTheme, type Theme } from '../lib/theme'
 
 interface ThemeContextValue {
   theme: Theme
@@ -15,26 +14,37 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
 })
 
-function getInitialTheme(): Theme {
-  const saved = prefGet('theme')
-  if (saved === 'light' || saved === 'dark') return saved
-  return 'dark'
+function systemTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark'
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme)
+function ThemeProvider({ children }: { children: ReactNode }) {
+  const [explicit, setExplicit] = useState<Theme | null>(() => {
+    const saved = prefGet('theme')
+    return saved === 'light' || saved === 'dark' ? saved : null
+  })
+  const [system, setSystem] = useState<Theme>(systemTheme)
+  const theme = resolveTheme(explicit, system)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    prefSet('theme', theme)
   }, [theme])
 
-  function setTheme(t: Theme) {
-    setThemeState(t)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const onChange = () => setSystem(mq.matches ? 'light' : 'dark')
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  function setTheme(next: Theme) {
+    setExplicit(next)
+    prefSet('theme', next)
   }
 
   function toggleTheme() {
-    setThemeState((t) => (t === 'dark' ? 'light' : 'dark'))
+    setTheme(theme === 'dark' ? 'light' : 'dark')
   }
 
   return (
@@ -44,6 +54,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useTheme() {
+function useTheme() {
   return useContext(ThemeContext)
 }
+
+export { ThemeProvider, useTheme }
+export type { Theme }

@@ -1,23 +1,33 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTheme } from '../context/ThemeContext'
+import type { Theme } from '../lib/theme'
 
-const items = [
-  { to: '/', label: 'Painel', hint: 'Visão da infraestrutura' },
-  { to: '/broke', label: 'Algo quebrou', hint: 'Último ship e o que fazer' },
-  { to: '/problems', label: 'Erros', hint: 'Crash loop, OOM, exit code' },
-  { to: '/containers', label: 'Containers', hint: 'Start, stop, logs, terminal' },
-  { to: '/stacks', label: 'Stacks', hint: 'Projetos compose' },
-  { to: '/investigate/demo', label: 'Investigar', hint: 'Diagnóstico de um container' },
-  { to: '/security', label: 'Segurança', hint: 'Auditoria de configuração' },
-  { to: '/logs', label: 'Log Center', hint: 'Busca e incidentes' },
-  { to: '/alerts', label: 'Alertas', hint: 'Histórico e canais' },
-  { to: '/deploy', label: 'Deploy', hint: 'Compose up e drift' },
-  { to: '/settings', label: 'Organização', hint: 'Usuários, times, SSO, auditoria' },
-  { to: '/images', label: 'Imagens', hint: 'Registry e CVE' },
-  { to: '/volumes', label: 'Volumes', hint: 'Backup e limpeza' },
-  { to: '/networks', label: 'Redes', hint: 'Inspect' },
-  { to: '/cleanup', label: 'Limpeza', hint: 'Safe prune' },
-  { to: '/metrics', label: 'Métricas', hint: 'CPU e memória' },
+type PaletteItem = {
+  id: string
+  label: string
+  hint: string
+  to?: string
+  theme?: Theme
+}
+
+const routes: PaletteItem[] = [
+  { id: 'home', to: '/', label: 'Painel', hint: 'Visão da infraestrutura' },
+  { id: 'broke', to: '/broke', label: 'Algo quebrou', hint: 'Último ship e o que fazer' },
+  { id: 'problems', to: '/problems', label: 'Erros', hint: 'Crash loop, OOM, exit code' },
+  { id: 'containers', to: '/containers', label: 'Containers', hint: 'Start, stop, logs, terminal' },
+  { id: 'stacks', to: '/stacks', label: 'Stacks', hint: 'Projetos compose' },
+  { id: 'investigate', to: '/investigate/demo', label: 'Investigar', hint: 'Diagnóstico de um container' },
+  { id: 'security', to: '/security', label: 'Segurança', hint: 'Auditoria de configuração' },
+  { id: 'logs', to: '/logs', label: 'Log Center', hint: 'Busca e incidentes' },
+  { id: 'alerts', to: '/alerts', label: 'Alertas', hint: 'Histórico e canais' },
+  { id: 'deploy', to: '/deploy', label: 'Deploy', hint: 'Compose up e drift' },
+  { id: 'settings', to: '/settings', label: 'Organização', hint: 'Usuários, times, SSO, auditoria' },
+  { id: 'images', to: '/images', label: 'Imagens', hint: 'Registry e CVE' },
+  { id: 'volumes', to: '/volumes', label: 'Volumes', hint: 'Backup e limpeza' },
+  { id: 'networks', to: '/networks', label: 'Redes', hint: 'Inspect' },
+  { id: 'cleanup', to: '/cleanup', label: 'Limpeza', hint: 'Safe prune' },
+  { id: 'metrics', to: '/metrics', label: 'Métricas', hint: 'CPU e memória' },
 ]
 
 interface PaletteApi {
@@ -35,12 +45,19 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
   const navigate = useNavigate()
+  const { theme, setTheme } = useTheme()
+
+  const items = useMemo<PaletteItem[]>(() => [
+    ...routes,
+    { id: 'theme-light', theme: 'light', label: 'Tema Dia', hint: theme === 'light' ? 'Ativo agora' : 'Fundo claro' },
+    { id: 'theme-dark', theme: 'dark', label: 'Tema Noite', hint: theme === 'dark' ? 'Ativo agora' : 'Fundo escuro' },
+  ], [theme])
 
   const filtered = useMemo(() => {
     const n = q.trim().toLowerCase()
     if (!n) return items
     return items.filter((it) => (it.label + ' ' + it.hint).toLowerCase().includes(n))
-  }, [q])
+  }, [q, items])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -59,9 +76,13 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { setActive(0) }, [q])
 
-  function go(to: string) {
+  function choose(item: PaletteItem) {
     setOpen(false)
-    navigate(to)
+    if (item.theme) {
+      setTheme(item.theme)
+      return
+    }
+    if (item.to) navigate(item.to)
   }
 
   return (
@@ -84,7 +105,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   e.preventDefault()
                   setActive((i) => Math.max(0, i - 1))
                 } else if (e.key === 'Enter' && filtered[active]) {
-                  go(filtered[active].to)
+                  choose(filtered[active])
                 }
               }}
             />
@@ -94,12 +115,12 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
               )}
               {filtered.map((it, i) => (
                 <button
-                  key={it.to}
+                  key={it.id}
                   type="button"
                   className="cmdk-item"
                   data-active={i === active}
                   onMouseEnter={() => setActive(i)}
-                  onClick={() => go(it.to)}
+                  onClick={() => choose(it)}
                 >
                   <span>{it.label}</span>
                   <span className="text-xs text-text-faint">{it.hint}</span>

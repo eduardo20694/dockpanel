@@ -103,37 +103,65 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(shots, `${name}.png`) })
 }
 
+async function useTheme(page: Page, theme: 'light' | 'dark') {
+  await page.addInitScript((value) => {
+    localStorage.setItem('dockerpilot-theme', value)
+  }, theme)
+}
+
+const tour: [string, string, string][] = [
+  ['/', 'Produção', 'dashboard'],
+  ['/containers', 'Containers', 'containers'],
+  ['/stacks', 'Stacks', 'stacks'],
+  ['/problems', 'Erros & diagnóstico', 'problems'],
+  ['/broke', 'Algo quebrou', 'broke'],
+  ['/investigate/abc', 'api', 'investigate'],
+  ['/security', 'Segurança', 'security'],
+  ['/logs', 'Log Center', 'logs'],
+  ['/alerts', 'Alertas', 'alerts'],
+  ['/settings', 'Organização', 'settings'],
+]
+
 test('login e entrada', async ({ page }) => {
+  await useTheme(page, 'dark')
   await mockApi(page, { anonymous: true })
   await page.goto('/login')
   await expect(page.getByRole('heading', { name: 'Dockpilot' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Noite' })).toHaveAttribute('aria-pressed', 'true')
   await shot(page, 'login')
+  await page.getByRole('button', { name: 'Dia', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await shot(page, 'login-dia')
   await page.getByLabel('Email').fill('ana@org.dev')
   await page.getByLabel('Senha').fill('secret-pass')
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Produção' })).toBeVisible()
 })
 
-test('telas principais, paleta e problema resolvido', async ({ page }) => {
+test('tema segue o sistema, persiste e troca pela paleta', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' })
   await mockApi(page)
   await page.goto('/')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await page.getByRole('button', { name: 'Noite', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.reload()
   await expect(page.getByRole('heading', { name: 'Produção' })).toBeVisible()
-  await shot(page, 'dashboard')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.keyboard.press('Control+K')
+  await page.getByLabel('Buscar tela').fill('dia')
+  await page.getByRole('button', { name: /Tema Dia/ }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.getByRole('button', { name: 'Dia', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
 
-  const tour: [string, string, string][] = [
-    ['/containers', 'Containers', 'containers'],
-    ['/stacks', 'Stacks', 'stacks'],
-    ['/problems', 'Erros & diagnóstico', 'problems'],
-    ['/broke', 'Algo quebrou', 'broke'],
-    ['/investigate/abc', 'api', 'investigate'],
-    ['/security', 'Segurança', 'security'],
-    ['/logs', 'Log Center', 'logs'],
-    ['/alerts', 'Alertas', 'alerts'],
-    ['/settings', 'Organização', 'settings'],
-  ]
+test('telas principais nos dois temas', async ({ page }) => {
+  await mockApi(page)
+  await useTheme(page, 'dark')
   for (const [href, heading, file] of tour) {
     await page.goto(href)
     await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await shot(page, file)
   }
 
@@ -148,4 +176,16 @@ test('telas principais, paleta e problema resolvido', async ({ page }) => {
   await page.getByRole('button', { name: /Algo quebrou/ }).click()
   await expect(page.getByRole('heading', { name: 'Algo quebrou' })).toBeVisible()
   await expect(page.locator('.badge-critical', { hasText: 'rollback para 1.3.0' })).toBeVisible()
+
+  await useTheme(page, 'light')
+  for (const [href, heading, file] of tour) {
+    await page.goto(href)
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    await shot(page, `${file}-dia`)
+  }
+  await page.keyboard.press('Control+K')
+  await page.getByLabel('Buscar tela').fill('noite')
+  await expect(page.getByRole('button', { name: /Tema Noite/ })).toBeVisible()
+  await shot(page, 'command-palette-dia')
 })

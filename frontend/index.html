@@ -11,7 +11,9 @@
     <script>
       (function () {
         var t = localStorage.getItem('dockerpilot-theme') || localStorage.getItem('dockpanel-theme');
-        if (t !== 'light' && t !== 'dark') t = 'dark';
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
         document.documentElement.setAttribute('data-theme', t);
       })();
     </script>
