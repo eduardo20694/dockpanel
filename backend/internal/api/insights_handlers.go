@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/drift"
-	"dockpanel/internal/insights"
-	"dockpanel/internal/stacks"
-	"dockpanel/internal/store"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/drift"
+	"dockerpilot/internal/insights"
+	"dockerpilot/internal/stacks"
+	"dockerpilot/internal/store"
 
 	"github.com/docker/docker/client"
 	"github.com/go-chi/chi/v5"
@@ -146,8 +146,8 @@ func (s *Server) investigateContainer(w http.ResponseWriter, r *http.Request) {
 		Diagnosis: diag,
 		Inspect: map[string]interface{}{
 			"id": info.ID, "name": diag.Name, "image": info.Config.Image,
-			"project": info.Config.Labels["com.docker.compose.project"],
-			"service": info.Config.Labels["com.docker.compose.service"],
+			"project":  info.Config.Labels["com.docker.compose.project"],
+			"service":  info.Config.Labels["com.docker.compose.service"],
 			"networks": networks, "mounts": len(info.Mounts), "envCount": len(info.Config.Env),
 			"restartPolicy": info.HostConfig.RestartPolicy.Name, "memLimit": info.HostConfig.Memory,
 			"privileged": info.HostConfig.Privileged, "user": info.Config.User,
@@ -197,8 +197,8 @@ func filterSecurity(ctx context.Context, cli *client.Client, hostID, hostLabel, 
 }
 
 func (s *Server) resolveHostID(r *http.Request) string {
-	id := dockerclient.HostIDFromRequest(r.Header.Get("X-Dockpanel-Host"), r.URL.Query().Get("host"))
-	if id == "" {
+	id := dockerclient.HostIDFromRequest(hostHeader(r), r.URL.Query().Get("host"))
+	if id == "" && s.Hosts != nil {
 		id = s.Hosts.DefaultID()
 	}
 	return id

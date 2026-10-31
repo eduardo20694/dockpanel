@@ -1,12 +1,12 @@
 package api
 
 import (
+	"dockerpilot/internal/envx"
 	"net/http"
 	"net/url"
-	"os"
 
-	"dockpanel/internal/backup"
-	"dockpanel/internal/scan"
+	"dockerpilot/internal/backup"
+	"dockerpilot/internal/scan"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/image"
@@ -109,7 +109,7 @@ func (s *Server) backupVolume(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	dest := r.URL.Query().Get("dest")
 	if dest == "" {
-		dest = os.Getenv("DOCKPANEL_BACKUP_DIR")
+		dest = envx.Get("BACKUP_DIR")
 	}
 	res, err := backup.BackupVolume(r.Context(), name, dest, "")
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *Server) removeVolume(w http.ResponseWriter, r *http.Request) {
 
 	var backupResult any
 	if backupFirst {
-		dest := os.Getenv("DOCKPANEL_BACKUP_DIR")
+		dest := envx.Get("BACKUP_DIR")
 		res, err := backup.BackupVolume(r.Context(), name, dest, "")
 		if err != nil {
 			writeErr(w, err)

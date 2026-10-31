@@ -2,6 +2,7 @@ package logcenter
 
 import (
 	"database/sql"
+	"dockerpilot/internal/envx"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ type Store struct {
 
 func Open(dir string) (*Store, error) {
 	if dir == "" {
-		dir = os.Getenv("DOCKPANEL_DATA_DIR")
+		dir = envx.Get("DATA_DIR")
 		if dir == "" {
 			dir = "data"
 		}
@@ -130,7 +131,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 func (s *Store) ensureRetentionSetting() error {
 	days := DefaultRetentionDays
-	if v := strings.TrimSpace(os.Getenv("DOCKPANEL_LOG_RETENTION_DAYS")); v != "" {
+	if v := strings.TrimSpace(envx.Get("LOG_RETENTION_DAYS")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			days = clampRetention(n)
 		}
@@ -215,7 +216,7 @@ func (s *Store) Search(p SearchParams) (*SearchResult, error) {
 		p.Limit = 100
 	}
 	var (
-		args []interface{}
+		args  []interface{}
 		where []string
 	)
 	where = append(where, "1=1")

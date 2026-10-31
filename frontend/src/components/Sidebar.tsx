@@ -7,6 +7,7 @@ const groups = [
     label: 'Visão geral',
     items: [
       { to: '/', label: 'Painel', icon: ChartIcon },
+      { to: '/broke', label: 'Algo quebrou', icon: AlertIcon },
       { to: '/problems', label: 'Erros', icon: AlertIcon },
       { to: '/stacks', label: 'Stacks', icon: StackIcon },
       { to: '/security', label: 'Segurança', icon: ShieldIcon },
@@ -29,6 +30,7 @@ const groups = [
     label: 'Operações',
     items: [
       { to: '/deploy', label: 'Deploy', icon: RocketIcon },
+      { to: '/settings', label: 'Organização', icon: ShieldIcon },
     ],
   },
 ]
@@ -48,8 +50,8 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 min-w-0">
           <img src="/favicon.svg" alt="" className="w-8 h-8 rounded-lg shrink-0" width={32} height={32} />
           <div className="min-w-0">
-            <div className="font-display font-bold text-[15px] tracking-tight text-text">Dockwatch</div>
-            <div className="text-[10px] text-text-faint font-medium tracking-wide">DOCKER OPS</div>
+            <div className="font-display font-semibold text-[15px] tracking-tight text-text">Dockpilot</div>
+            <div className="text-[10px] text-text-faint font-medium tracking-[0.16em]">OPERAÇÕES</div>
           </div>
         </div>
         <button
@@ -100,7 +102,7 @@ export default function Sidebar() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-tone-brand-strong">Live</span>
           </div>
           <div className="text-sm font-semibold text-text truncate">{hostLabel}</div>
-          <div className="text-[11px] text-text-muted mt-0.5">Dockwatch</div>
+          <div className="text-[11px] text-text-muted mt-0.5">Dockpilot</div>
         </div>
       </div>
     </>

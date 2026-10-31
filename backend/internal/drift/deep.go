@@ -16,11 +16,11 @@ import (
 
 type DeepItem struct {
 	Item
-	Kind           string   `json:"kind"` // image, missing, orphan, env, port
-	ComposePorts   []string `json:"composePorts,omitempty"`
-	RunningPorts   []string `json:"runningPorts,omitempty"`
-	MissingEnv     []string `json:"missingEnv,omitempty"`
-	ExtraEnv       []string `json:"extraEnv,omitempty"`
+	Kind         string   `json:"kind"` // image, missing, orphan, env, port
+	ComposePorts []string `json:"composePorts,omitempty"`
+	RunningPorts []string `json:"runningPorts,omitempty"`
+	MissingEnv   []string `json:"missingEnv,omitempty"`
+	ExtraEnv     []string `json:"extraEnv,omitempty"`
 }
 
 type DeepReport struct {
@@ -31,9 +31,9 @@ type DeepReport struct {
 }
 
 type composeServiceDeep struct {
-	Image string            `yaml:"image"`
-	Build interface{}       `yaml:"build"`
-	Ports []interface{}     `yaml:"ports"`
+	Image       string        `yaml:"image"`
+	Build       interface{}   `yaml:"build"`
+	Ports       []interface{} `yaml:"ports"`
 	Environment []interface{} `yaml:"environment"`
 }
 

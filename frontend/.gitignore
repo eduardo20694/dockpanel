@@ -1,6 +1,8 @@
 # frontend/ — mirrors root invariants from .cursor/rules/00-project-identity.mdc
 node_modules/
 dist/
+test-results/
+playwright-report/
 .vite/
 *.exe
 .env

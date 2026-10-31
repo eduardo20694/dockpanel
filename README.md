@@ -1,207 +1,117 @@
-# Dockwatch
+# Dockpilot
 
-**Painel de operações Docker self-hosted.** Um container na VPS, socket montado, login único — você vê e controla a infraestrutura sem Portainer genérico, sem agent e sem banco.
+Painel e servidor MCP para operar Docker em organizações. Roda no host, fala com o socket ou com `ssh://`, e não precisa de um Portainer no meio.
 
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](./backend)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](./frontend)
-[![Docker](https://img.shields.io/badge/Docker-socket-2496ED?logo=docker&logoColor=white)](./docker-compose.yml)
-[![License](https://img.shields.io/badge/uso-self--hosted-informational)](#)
+O módulo Go é `dockerpilot`. O binário do painel é `dockerpilot` e o do MCP é `dockerpilot-mcp`. Variáveis `DOCKERPILOT_*` são as oficiais. `DOCKPANEL_*` continua valendo quando a nova não está definida, e o header `X-Dockpanel-Host` ainda é aceito ao lado de `X-Dockerpilot-Host`.
 
----
+## Por que não o Portainer MCP
 
-## Por que existe
+O [Portainer MCP](https://github.com/portainer/portainer-mcp) expõe a API do Portainer. Ele é forte se a organização já vive dentro do Portainer (Edge, Helm, GitOps, centenas de rotas geradas do OpenAPI). Ele também pede uma instância Portainer, uma API key por pessoa e, por padrão, devolve um guia na primeira chamada antes de executar a ferramenta.
 
-Operar Docker numa VPS costuma significar SSH + `docker ps` + compose na mão, ou um Portainer cheio de opções que você não precisa. O Dockwatch é o meio-termo: **painel focado em diagnóstico, segurança e deploy**, rodando **no mesmo host** que o Docker Engine.
+O Dockpilot cobre as mesmas áreas que importam para operar containers — vários ambientes, usuários e times, RBAC, stack com atualização e rollback, modo somente leitura, proxy Docker e Kubernetes quando faz sentido — e acrescenta o que o Portainer MCP não faz: diagnóstico, “algo quebrou”, auditoria de segurança, CVE com Trivy, drift de compose, Log Center, alertas, safe prune, backup de volume e trilha de auditoria. As descrições das ferramentas são escritas para o modelo, sem bloquear a primeira chamada.
 
-Feito para um operador (você), não para SaaS multi-tenant.
+Não reimplementamos Edge, Helm nem o catálogo inteiro de ~380 rotas do Portainer. Quem precisa administrar o produto Portainer continua no Portainer MCP. Quem precisa operar o Docker da organização usa o Dockpilot.
 
----
+## Comparação
 
-## O que ele faz
+| Capacidade | Portainer MCP | Dockpilot |
+|---|---|---|
+| Onde roda | Na frente de um Portainer | No host, socket ou `ssh://`, sem Portainer |
+| Vários ambientes | Endpoints do Portainer | `DOCKERPILOT_HOSTS` (local e SSH) |
+| Usuários, times, RBAC | Perfil ADMIN, via API do Portainer | Diretório local: admin, operator, auditor, viewer |
+| Organizações | O próprio Portainer | Multi-tenant em `orgs.json` |
+| Stack criar / atualizar | Sim, pela API do Portainer | Sim, com revisão do compose |
+| Rollback de stack | Depende do fluxo GitOps | Revisão local + ship registrado |
+| Somente leitura | `PORTAINER_READ_ONLY` | `DOCKERPILOT_READONLY` (API e MCP) |
+| Proxy Docker | Sim, pelo endpoint Portainer | Sim, direto na Engine API, com guarda de path |
+| Proxy Kubernetes | Sim | Sim, se `DOCKERPILOT_K8S_API` existir; senão explica que não está configurado |
+| SSO | API key do Portainer | OIDC pronto (issuer, client id, HMAC para o gateway) |
+| “O que quebrou” | Não | `/broke` + `what_broke`: último ship, restarts, Log Center |
+| Auditoria de segurança | Não é o foco | Privileged, `:latest`, portas, root |
+| CVE | Não | Trivy |
+| Drift de compose | Não | Compose local contra o que está rodando |
+| Log Center | Não | Busca, incidentes, retenção |
+| Alertas | Não | Telegram / Discord |
+| Safe prune | Não | Relatório sem apagar sozinho |
+| Backup | Backup do servidor Portainer | Backup de volume |
+| Trilha de auditoria | Não | JSONL de toda escrita da API |
+| Custo | Não | Estimativa USD/dia por reserva de CPU e memória |
+| Descrições para IA | Geradas do OpenAPI; a primeira chamada pode devolver só o guia | Escritas para o modelo; `dockpilot_guidance` é opcional e não bloqueia |
 
-| Área | Capacidades |
-|------|-------------|
-| **Visão** | Overview com saúde do host, problemas critical/warning, stacks e segurança |
-| **Containers** | Lista, start/stop/restart/remove, logs ao vivo, terminal, investigação com métricas |
-| **Erros** | Scan de crash loops, OOM, exit codes e padrões em logs |
-| **Stacks** | Projetos compose detectados pelos labels dos containers |
-| **Segurança** | Auditoria de configuração (privileged, :latest, mounts sensíveis, etc.) |
-| **Imagens** | Registry local + scan CVE via Trivy (binário ou fallback Docker) |
-| **Volumes / redes** | Listagem, backup de volume, inspect de rede |
-| **Deploy** | `docker compose` up/down/build/pull/logs + drift compose ↔ running |
-| **Limpeza** | Relatório safe-prune (dangling, volumes órfãos, exited) sem destruir nada sozinho |
-| **Métricas / alertas** | Histórico JSONL local; Telegram/Discord opcional |
-| **MCP** | Ferramentas stdio para Cursor / Claude gerenciarem o host via SSH ou socket |
+## O que o painel faz
 
----
+| Área | O que você vê |
+|---|---|
+| Painel | Saúde do host, problemas, segurança |
+| Algo quebrou | Relato do último ship e a sugestão: rollback, restart ou nada a fazer |
+| Erros | Crash loop, OOM, exit code; dá para marcar como resolvido |
+| Containers | Lista, ações, logs, terminal, investigação |
+| Stacks | Projetos compose e revisão / rollback |
+| Segurança | Score e findings |
+| Log Center | Busca, incidentes, retenção em `/api/logs/incidents/retention` |
+| Organização | Pessoas, times, SSO, custo, auditoria |
+| Deploy | `docker compose` e drift |
+| MCP | As mesmas capacidades para Cursor, Claude e outros clientes stdio |
 
 ## Arquitetura
 
 ```
-┌─────────────┐     :8083      ┌──────────────────────────────┐
-│  Browser    │ ─────────────► │  dockwatch (nginx + API Go)  │
-└─────────────┘                └──────────────┬───────────────┘
-                                              │
-                         ┌────────────────────┼────────────────────┐
-                         ▼                    ▼                    ▼
-              /var/run/docker.sock      volume /data         /opt/dockpanel
-              (Docker Engine)          (JSONL métricas)     (compose Deploy)
+Browser  →  nginx + dockerpilot (API Go)
+                ├─ socket Docker ou ssh://
+                ├─ /data  (last-ship.json, resolved_problems.json, audit.jsonl, orgs.json, logs)
+                └─ dockerpilot-mcp  (stdio, mesmo código de domínio)
 ```
 
-- **Sem Postgres / Redis** — estado operacional vive no Docker; histórico leve em arquivos.
-- **Sem agent** — o painel é o cliente do socket (ou `ssh://` para outro host, avançado).
-- **Segredos fora do YAML** — Portainer Environment / `.env`; o compose só referencia `${VAR}`.
+Estado operacional continua no Docker. O disco do Dockpilot guarda histórico, ships, revisões, diretório e auditoria. Não há Postgres.
 
----
-
-## Quick start (produção)
-
-### 1. Build & push (no seu PC)
-
-```powershell
-docker build -t redecoop/dockwatch:1.0.0 .
-docker push redecoop/dockwatch:1.0.0
-```
-
-### 2. Stack na VPS / Portainer
-
-Use o [`docker-compose.yml`](./docker-compose.yml) e cole as variáveis (modelo: [`.env.vps.example`](./.env.vps.example)):
-
-```env
-DOCKPANEL_ADMIN_EMAIL=voce@email.com
-DOCKPANEL_ADMIN_PASSWORD=senha-forte
-DOCKPANEL_ADMIN_NAME=Seu Nome
-DOCKPANEL_JWT_SECRET=<gere-um-segredo-longo-aleatorio>
-DOCKPANEL_HOSTS=[{"id":"local","label":"Docker","dockerHost":""}]
-DOCKPANEL_PROJECT_DIR=.
-DOCKPANEL_COMPOSE_PATH=/opt/dockpanel
-```
+## Subir
 
 ```bash
-docker compose pull
-docker compose up -d
+docker build -t redecoop/dockpilot:1.1.0 .
 ```
 
-Abra **http://IP_DA_VPS:8083** → login com o admin do Environment.
+Variáveis mínimas (o compose deste repositório ainda aceita os nomes `DOCKPANEL_*`):
 
-> `dockerHost: ""` = usa o socket montado. Não configure `ssh://` para o mesmo host onde o painel já roda.
+```env
+DOCKERPILOT_ADMIN_EMAIL=voce@org.dev
+DOCKERPILOT_ADMIN_PASSWORD=senha-forte
+DOCKERPILOT_JWT_SECRET=<segredo-com-32-ou-mais>
+DOCKERPILOT_HOSTS=[{"id":"local","label":"Docker","dockerHost":""}]
+```
 
----
+Opcionais: `DOCKERPILOT_READONLY=1`, `DOCKERPILOT_OIDC_ISSUER`, `DOCKERPILOT_OIDC_CLIENT_ID`, `DOCKERPILOT_OIDC_HMAC_SECRET`, `DOCKERPILOT_OIDC_ADMIN_GROUP`, `DOCKERPILOT_K8S_API`, `DOCKERPILOT_K8S_TOKEN`, `DOCKERPILOT_CPU_USD_HOUR`, `DOCKERPILOT_MEM_GB_USD_HOUR`, `DOCKERPILOT_DATA_DIR`, `DOCKERPILOT_COMPOSE_PATH`, `DOCKERPILOT_LOG_RETENTION_DAYS`.
 
-## Desenvolvimento local
+Papéis: `admin` administra pessoas e times; `operator` opera containers e stacks; `auditor` só lê, inclusive a trilha; `viewer` lê e não vê a trilha.
 
-Pré-requisitos: Go 1.25+, Node 20+, Docker Desktop (ou daemon local).
+## Desenvolvimento
 
-```powershell
+Go 1.25+ e Node 20+.
+
+```bash
 cp .env.example .env
-# ajuste DOCKPANEL_ADMIN_* e JWT
-
-# terminal 1
-cd backend
-go run ./cmd/server
-
-# terminal 2
-cd frontend
-npm install
-npm run dev
+cd backend && go test ./... && go run ./cmd/server
+cd frontend && npm ci && npm test && npm run dev
 ```
 
 | Serviço | URL |
-|---------|-----|
+|---|---|
 | UI | http://localhost:5173 |
 | API | http://localhost:8080 |
 
-```powershell
-cd backend;  go test ./...
-cd frontend; npm run build
+Testes de ponta a ponta da interface:
+
+```bash
+cd frontend && npx playwright install chromium && npm run test:e2e
 ```
 
----
+O MCP:
 
-## Variáveis de ambiente
-
-| Variável | Obrig. | Descrição |
-|----------|:------:|-----------|
-| `DOCKPANEL_ADMIN_EMAIL` | ✓ | Login |
-| `DOCKPANEL_ADMIN_PASSWORD` | ✓ | Senha |
-| `DOCKPANEL_JWT_SECRET` | ✓ | Segredo JWT (≥ 32 caracteres) |
-| `DOCKPANEL_ADMIN_NAME` | | Nome exibido no painel |
-| `DOCKPANEL_HOSTS` | ✓* | JSON de hosts; `dockerHost` vazio = socket |
-| `DOCKPANEL_DATA_DIR` | | Pasta JSONL (prod: `/data`) |
-| `DOCKPANEL_COMPOSE_PATH` | | Pasta com `docker-compose.yml` (tela Deploy) |
-| `DOCKPANEL_PROJECT_DIR` | | Path no host montado no container |
-| `DOCKPANEL_BACKUP_DIR` | | Destino de backup de volumes |
-| `DOCKPANEL_COMPOSE_PATH_REMOTE` | | Compose em host `ssh://` (MCP / avançado) |
-| `ALERT_TELEGRAM_BOT_TOKEN` / `CHAT_ID` | | Alertas + bot (`/metric`, `/problems`) |
-| `ALERT_DAILY_HOUR` | | Hora local do resumo diário (padrão `9`) |
-| `ALERT_DISCORD_WEBHOOK` | | Alertas Discord |
-
-\*Se omitido, a API sobe um host local padrão a partir de `DOCKER_HOST` / socket.
-
-**Nunca commite** `.env` nem `.cursor/mcp.json`.
-
----
-
-## MCP (Cursor / Claude)
-
-Gerencie a VPS a partir do laptop sem abrir o painel:
-
-```powershell
-cd backend
-go build -o dockwatch-mcp.exe ./cmd/mcp
-copy .cursor\mcp.json.example .cursor\mcp.json
-# edite SEU_IP e o caminho do .exe
+```bash
+cd backend && go build -o dockerpilot-mcp ./cmd/mcp
 ```
 
-| Server no example | Uso |
-|-------------------|-----|
-| `dockwatch-vps` | `ssh://root@SEU_IP` |
-| `dockwatch-local` | Socket Docker local |
+Ferramentas novas em relação ao painel antigo: `list_environments`, `list_users`, `create_user`, `list_teams`, `create_team`, `add_team_member`, `create_stack`, `update_stack`, `rollback_stack`, `docker_proxy`, `kubernetes_proxy`, `what_broke`, `resolve_problem`, `list_audit`, `cost_insights`, `dockpilot_guidance`. As ferramentas de diagnóstico, Trivy, drift, prune, backup e logs continuam.
 
-Ferramentas típicas: listar containers, logs, diagnóstico, drift de compose, prune report, scan Trivy, backup de volume, deploy compose.
+## Licença de uso
 
----
-
-## Estrutura do repositório
-
-```
-dockpanel/
-├── backend/
-│   ├── cmd/server/     # API HTTP
-│   ├── cmd/mcp/        # MCP stdio
-│   └── internal/       # dockerclient, diagnostics, deploy, scan, auth…
-├── frontend/
-│   └── src/pages/      # login + painel
-├── docker/
-│   ├── nginx.conf
-│   └── entrypoint.sh
-├── docker-compose.yml  # produção (pull image + socket)
-├── Dockerfile
-└── .env.vps.example
-```
-
-O módulo Go continua `dockpanel` (nome interno); o produto e a imagem são **Dockwatch**.
-
----
-
-## Decisões de design (resumo)
-
-1. **Socket first** — um container na VPS é o caminho feliz; SSH é para o MCP no laptop ou segundo host.
-2. **Auth env-only** — um admin, JWT em cookie httpOnly; zero users table.
-3. **JSONL em vez de DB** — métricas/alertas sem operar Postgres na VPS.
-4. **Compose sem segredos** — Portainer injeta Environment; YAML versionável com segurança.
-5. **Trivy pragmático** — binário se existir; senão `docker run aquasec/trivy`.
-
----
-
-## Roadmap / limites honestos
-
-- Terminal e logs são por container (não há “log center” global sem store extra).
-- Alertas externos só disparam se `ALERT_*` estiver configurado; o histórico local roda sempre.
-- Multi-host avançado existe via `DOCKPANEL_HOSTS`, mas o produto é otimizado para **um host**.
-
----
-
-## Licença
-
-Uso self-hosted. Ajuste a licença formal se for publicar o repositório como open source.
+Self-hosted. Segredos ficam no ambiente, nunca no compose commitado.

@@ -9,15 +9,19 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"dockpanel/internal/alerts"
-	"dockpanel/internal/api"
-	"dockpanel/internal/auth"
-	"dockpanel/internal/collector"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/logcenter"
-	"dockpanel/internal/observability"
-	"dockpanel/internal/store"
-	"dockpanel/internal/telegram"
+	"dockerpilot/internal/alerts"
+	"dockerpilot/internal/api"
+	"dockerpilot/internal/audit"
+	"dockerpilot/internal/auth"
+	"dockerpilot/internal/collector"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/envx"
+	"dockerpilot/internal/logcenter"
+	"dockerpilot/internal/observability"
+	"dockerpilot/internal/org"
+	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/store"
+	"dockerpilot/internal/telegram"
 
 	"github.com/joho/godotenv"
 )
@@ -27,7 +31,7 @@ func loadEnv() {
 		filepath.Join("..", ".env"),
 		".env",
 	}
-	if root := os.Getenv("DOCKPANEL_ROOT"); root != "" {
+	if root := envx.Get("ROOT"); root != "" {
 		candidates = append([]string{filepath.Join(root, ".env")}, candidates...)
 	}
 	for _, p := range candidates {
@@ -78,7 +82,27 @@ func main() {
 	if authSvc.Enabled {
 		log.Printf("auth: login ativo (admin env)")
 	} else {
-		log.Printf("auth: desabilitado (defina DOCKPANEL_ADMIN_EMAIL e DOCKPANEL_ADMIN_PASSWORD)")
+		log.Printf("auth: desabilitado (defina DOCKERPILOT_ADMIN_EMAIL e DOCKERPILOT_ADMIN_PASSWORD)")
+	}
+
+	dataDir := envx.DataDir()
+	var auditLog *audit.Log
+	if al, err := audit.Open(dataDir); err != nil {
+		log.Printf("aviso: auditoria desabilitada: %v", err)
+	} else {
+		auditLog = al
+	}
+	var orgs *org.Store
+	if og, err := org.Open(dataDir); err != nil {
+		log.Printf("aviso: organizações desabilitadas: %v", err)
+	} else {
+		orgs = og
+	}
+	var resolvedStore *resolved.Store
+	if rs, err := resolved.Open(dataDir); err != nil {
+		log.Printf("aviso: problemas resolvidos desabilitados: %v", err)
+	} else {
+		resolvedStore = rs
 	}
 
 	notifier := alerts.NewFromEnv()
@@ -97,6 +121,7 @@ func main() {
 
 	server := api.NewServerFromDeps(api.Deps{
 		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
+		Audit: auditLog, Orgs: orgs, Resolved: resolvedStore, DataDir: dataDir,
 	})
 
 	port := os.Getenv("PORT")
@@ -104,6 +129,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("dockpanel backend ouvindo em :%s", port)
+	log.Printf("dockpilot backend ouvindo em :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, server.Router))
 }

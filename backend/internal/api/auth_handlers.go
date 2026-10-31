@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"dockpanel/internal/auth"
+	"dockerpilot/internal/auth"
 )
 
 func (s *Server) authConfig(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +22,9 @@ func setAuthCookies(w http.ResponseWriter, r *http.Request, access string) {
 }
 
 func clearAuthCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: auth.CookieName(), Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
+	for _, name := range []string{auth.CookieName(), auth.LegacyCookieName()} {
+		http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
+	}
 }
 
 func (s *Server) checkLoginRate(w http.ResponseWriter, r *http.Request) bool {
@@ -65,7 +67,7 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 	if s.Auth == nil || !s.Auth.Enabled {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "autenticação desabilitada — configure DOCKPANEL_ADMIN_EMAIL e DOCKPANEL_ADMIN_PASSWORD"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "autenticação desabilitada — configure DOCKERPILOT_ADMIN_EMAIL e DOCKERPILOT_ADMIN_PASSWORD (DOCKPANEL_* também vale)"})
 		return
 	}
 	if !s.checkLoginRate(w, r) {
@@ -80,6 +82,16 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := s.Auth.Login(body.Email, body.Password)
+	if err != nil && s.Orgs != nil {
+		if u, ok, err2 := s.Orgs.Authenticate(body.Email, body.Password); err2 == nil && ok {
+			tok, err3 := s.Auth.Issue(auth.User{ID: u.ID, Email: u.Email, Name: u.Name, Role: u.Role, OrgID: u.OrgID})
+			if err3 == nil {
+				setAuthCookies(w, r, tok)
+				writeJSON(w, map[string]interface{}{"user": auth.User{ID: u.ID, Email: u.Email, Name: u.Name, Role: u.Role, OrgID: u.OrgID}})
+				return
+			}
+		}
+	}
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)

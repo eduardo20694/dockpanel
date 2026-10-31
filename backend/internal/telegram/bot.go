@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"dockpanel/internal/alerts"
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/metrics"
-	"dockpanel/internal/tgmsg"
+	"dockerpilot/internal/alerts"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/metrics"
+	"dockerpilot/internal/tgmsg"
 )
 
 // Bot listens for Telegram commands (getUpdates) and replies in allowlisted chats.

@@ -1,6 +1,7 @@
 package dockerclient
 
 import (
+	"dockerpilot/internal/envx"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,14 +24,14 @@ type Pool struct {
 }
 
 func NewPoolFromEnv() (*Pool, error) {
-	raw := os.Getenv("DOCKPANEL_HOSTS")
+	raw := envx.GetRaw("HOSTS")
 	if raw != "" {
 		var hosts []HostConfig
 		if err := json.Unmarshal([]byte(raw), &hosts); err != nil {
-			return nil, fmt.Errorf("DOCKPANEL_HOSTS inválido: %w", err)
+			return nil, fmt.Errorf("DOCKERPILOT_HOSTS (ou DOCKPANEL_HOSTS) inválido: %w", err)
 		}
 		if len(hosts) == 0 {
-			return nil, fmt.Errorf("DOCKPANEL_HOSTS vazio")
+			return nil, fmt.Errorf("DOCKERPILOT_HOSTS (ou DOCKPANEL_HOSTS) vazio")
 		}
 		return NewPool(hosts, hosts[0].ID)
 	}

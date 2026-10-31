@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"dockpanel/internal/deploy"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/dockerclient"
 )
 
 func (s *Server) deployPresets(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +32,7 @@ func (s *Server) deployCompose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.DockerHost == "" {
-		hostID := dockerclient.HostIDFromRequest(r.Header.Get("X-Dockpanel-Host"), r.URL.Query().Get("host"))
+		hostID := dockerclient.HostIDFromRequest(hostHeader(r), r.URL.Query().Get("host"))
 		for _, h := range s.Hosts.List() {
 			if h.ID == hostID || (hostID == "" && h.ID == s.Hosts.DefaultID()) {
 				req.DockerHost = h.DockerHost
@@ -59,6 +59,9 @@ func (s *Server) deployCompose(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if res.OK {
+		s.recordShipFromCompose(r, req)
+	}
 	writeJSON(w, res)
 }
 
@@ -74,11 +77,11 @@ func (s *Server) deployComposeStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{
 			"services": []deploy.ServiceStatus{},
 			"result":   nil,
-			"hint":     "Defina DOCKPANEL_COMPOSE_PATH ou informe a pasta com docker-compose.yml",
+			"hint":     "Defina DOCKERPILOT_COMPOSE_PATH (ou DOCKPANEL_COMPOSE_PATH) ou informe a pasta com docker-compose.yml",
 		})
 		return
 	}
-	hostID := dockerclient.HostIDFromRequest(r.Header.Get("X-Dockpanel-Host"), r.URL.Query().Get("host"))
+	hostID := dockerclient.HostIDFromRequest(hostHeader(r), r.URL.Query().Get("host"))
 	req := deploy.ComposeRequest{ProjectPath: path, Action: "ps"}
 	for _, h := range s.Hosts.List() {
 		if h.ID == hostID || (hostID == "" && h.ID == s.Hosts.DefaultID()) {

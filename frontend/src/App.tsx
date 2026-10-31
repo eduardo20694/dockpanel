@@ -23,6 +23,9 @@ import Cleanup from './pages/Cleanup'
 import Alerts from './pages/Alerts'
 import Metrics from './pages/Metrics'
 import LogCenter from './pages/LogCenter'
+import Broke from './pages/Broke'
+import Settings from './pages/Settings'
+import { CommandPaletteProvider } from './components/CommandPalette'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, retry: 1 } },
@@ -32,6 +35,7 @@ function PanelShell() {
   return (
     <HostProvider>
       <NavProvider>
+        <CommandPaletteProvider>
         <div className="flex h-screen overflow-hidden bg-base">
           <Sidebar />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -43,6 +47,7 @@ function PanelShell() {
             </main>
           </div>
         </div>
+        </CommandPaletteProvider>
       </NavProvider>
     </HostProvider>
   )
@@ -73,7 +78,9 @@ function AppRoutes() {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<PanelShell />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/broke" element={<Broke />} />
         <Route path="/problems" element={<Problems />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/stacks" element={<Stacks />} />
         <Route path="/security" element={<Security />} />
         <Route path="/alerts" element={<Alerts />} />

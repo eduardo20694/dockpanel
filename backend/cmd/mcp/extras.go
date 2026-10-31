@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"dockpanel/internal/backup"
-	"dockpanel/internal/deploy"
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/drift"
-	"dockpanel/internal/insights"
-	"dockpanel/internal/logcenter"
-	"dockpanel/internal/scan"
-	"dockpanel/internal/stacks"
+	"dockerpilot/internal/backup"
+	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/drift"
+	"dockerpilot/internal/insights"
+	"dockerpilot/internal/logcenter"
+	"dockerpilot/internal/scan"
+	"dockerpilot/internal/stacks"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -105,6 +105,9 @@ func registerBackupVolume(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		name, err := req.RequireString("volume")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil

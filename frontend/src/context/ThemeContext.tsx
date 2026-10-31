@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { prefGet, prefSet } from '../lib/prefs'
 
 export type Theme = 'dark' | 'light'
 
@@ -15,7 +16,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 })
 
 function getInitialTheme(): Theme {
-  const saved = localStorage.getItem('dockpanel-theme')
+  const saved = prefGet('theme')
   if (saved === 'light' || saved === 'dark') return saved
   return 'dark'
 }
@@ -25,7 +26,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('dockpanel-theme', theme)
+    prefSet('theme', theme)
   }, [theme])
 
   function setTheme(t: Theme) {

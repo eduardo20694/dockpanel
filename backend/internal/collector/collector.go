@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/store"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/store"
 
 	"github.com/docker/docker/api/types/container"
 )

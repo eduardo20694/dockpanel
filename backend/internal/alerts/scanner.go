@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"dockpanel/internal/clock"
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/metrics"
-	"dockpanel/internal/store"
-	"dockpanel/internal/tgmsg"
+	"dockerpilot/internal/clock"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/metrics"
+	"dockerpilot/internal/store"
+	"dockerpilot/internal/tgmsg"
 )
 
 type Scanner struct {

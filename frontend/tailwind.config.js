@@ -49,9 +49,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Figtree', 'system-ui', 'sans-serif'],
-        display: ['Syne', 'Figtree', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        sans: ['Geist', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
         glow: 'var(--c-shadow-glow)',
@@ -72,7 +72,7 @@ export default {
       keyframes: {
         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         pulseSoft: {

@@ -6,10 +6,14 @@ import (
 	"reflect"
 	"strings"
 
-	"dockpanel/internal/auth"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/logcenter"
-	"dockpanel/internal/store"
+	"dockerpilot/internal/audit"
+	"dockerpilot/internal/auth"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/envx"
+	"dockerpilot/internal/logcenter"
+	"dockerpilot/internal/org"
+	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/store"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -21,6 +25,10 @@ type Server struct {
 	Store    *store.Store
 	LogStore *logcenter.Store
 	Auth     *auth.Service
+	Audit    *audit.Log
+	Orgs     *org.Store
+	Resolved *resolved.Store
+	DataDir  string
 	Router   *chi.Mux
 }
 
@@ -29,15 +37,30 @@ type Deps struct {
 	Store    *store.Store
 	LogStore *logcenter.Store
 	Auth     *auth.Service
+	Audit    *audit.Log
+	Orgs     *org.Store
+	Resolved *resolved.Store
+	DataDir  string
 }
 
 func NewServerFromDeps(d Deps) *Server {
+	if d.DataDir == "" {
+		d.DataDir = envx.DataDir()
+	}
 	s := &Server{
 		Hosts: d.Hosts, Store: d.Store, LogStore: d.LogStore, Auth: d.Auth,
+		Audit: d.Audit, Orgs: d.Orgs, Resolved: d.Resolved, DataDir: d.DataDir,
 		Router: chi.NewRouter(),
 	}
 	s.routes()
 	return s
+}
+
+func (s *Server) dataDir() string {
+	if s != nil && s.DataDir != "" {
+		return s.DataDir
+	}
+	return envx.DataDir()
 }
 
 func (s *Server) routes() {
@@ -51,11 +74,14 @@ func (s *Server) routes() {
 			"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:9090",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Dockpanel-Host", "X-Request-Id"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Dockerpilot-Host", "X-Dockpanel-Host", "X-Request-Id"},
 		ExposedHeaders:   []string{"X-Request-Id"},
 		AllowCredentials: true,
 	}))
 	r.Use(s.authMiddleware)
+	r.Use(s.readonlyMiddleware)
+	r.Use(s.rbacMiddleware)
+	r.Use(s.auditMiddleware)
 
 	r.Get("/api/health", s.health)
 	r.Get("/api/health/detailed", s.healthDetailed)
@@ -63,6 +89,8 @@ func (s *Server) routes() {
 	r.Post("/api/client-errors", s.clientErrorLog)
 
 	r.Get("/api/auth/config", s.authConfig)
+	r.Get("/api/auth/sso", s.authSSOConfig)
+	r.Post("/api/auth/sso/exchange", s.authSSOExchange)
 	r.Post("/api/auth/login", s.authLogin)
 	r.Post("/api/auth/logout", s.authLogout)
 	r.Get("/api/auth/me", s.authMe)
@@ -75,6 +103,25 @@ func (s *Server) routes() {
 	r.Get("/api/system/info", s.systemInfo)
 	r.Get("/api/system/df", s.dfUsage)
 	r.Get("/api/system/problems", s.scanProblems)
+	r.Get("/api/system/problems/resolved", s.listResolvedProblems)
+	r.Post("/api/system/problems/resolve", s.resolveProblem)
+	r.Delete("/api/system/problems/resolve", s.unresolveProblem)
+	r.Get("/api/system/readonly", s.readonlyStatus)
+	r.Get("/api/triage", s.whatBroke)
+	r.Get("/api/insights/cost", s.costInsights)
+	r.Get("/api/audit", s.listAudit)
+	r.Get("/api/orgs", s.listOrgs)
+	r.Get("/api/users", s.listUsers)
+	r.Post("/api/users", s.createUser)
+	r.Patch("/api/users/{id}", s.updateUser)
+	r.Get("/api/teams", s.listTeams)
+	r.Post("/api/teams", s.createTeam)
+	r.Post("/api/teams/{id}/members", s.addTeamMember)
+	r.Get("/api/stacks/revisions", s.listStackRevisions)
+	r.Post("/api/stacks/apply", s.applyStack)
+	r.Post("/api/stacks/rollback", s.rollbackStack)
+	r.Post("/api/proxy/docker", s.dockerProxy)
+	r.Post("/api/proxy/kubernetes", s.kubernetesProxy)
 	r.Get("/api/system/safe-prune", s.safePruneReport)
 	r.Get("/api/system/drift", s.composeDrift)
 	r.Get("/api/system/drift/deep", s.deepDrift)
@@ -93,6 +140,8 @@ func (s *Server) routes() {
 		r.Get("/incidents", s.listLogIncidents)
 		r.Get("/retention", s.getLogRetention)
 		r.Put("/retention", s.putLogRetention)
+		r.Get("/incidents/retention", s.getLogRetention)
+		r.Put("/incidents/retention", s.putLogRetention)
 	})
 
 	r.Route("/api/containers", func(r chi.Router) {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"dockpanel/internal/auth"
+	"dockerpilot/internal/auth"
 )
 
 type ctxKey int
@@ -18,8 +18,10 @@ func userFromContext(r *http.Request) *auth.User {
 }
 
 func tokenFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(auth.CookieName()); err == nil && c.Value != "" {
-		return c.Value
+	for _, name := range []string{auth.CookieName(), auth.LegacyCookieName()} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" {
+			return c.Value
+		}
 	}
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(h), "bearer ") {
 		return strings.TrimSpace(h[7:])
@@ -63,7 +65,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 func isPublicRoute(path string) bool {
 	switch path {
 	case "/api/health", "/api/health/detailed", "/api/openapi.json",
-		"/api/auth/login", "/api/auth/config",
+		"/api/auth/login", "/api/auth/config", "/api/auth/sso", "/api/auth/sso/exchange",
 		"/api/auth/me", "/api/auth/logout",
 		"/api/client-errors":
 		return true

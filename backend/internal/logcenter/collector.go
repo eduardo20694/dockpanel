@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -200,8 +200,8 @@ func (c *Collector) streamOnce(ctx context.Context, hostID, containerID, name st
 
 type lineWriter struct {
 	hostID, containerID, name, stream string
-	store                              *Store
-	buf                                string
+	store                             *Store
+	buf                               string
 }
 
 func (w *lineWriter) Write(p []byte) (int, error) {

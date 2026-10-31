@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { api } from '../api/client'
+import { prefGet, prefRemove, prefSet } from '../lib/prefs'
 
 export interface DockerHost {
   id: string
@@ -25,7 +26,7 @@ const HostContext = createContext<HostContextValue>({
 
 export function HostProvider({ children }: { children: ReactNode }) {
   const [hosts, setHosts] = useState<DockerHost[]>([])
-  const [hostId, setHostIdState] = useState(() => localStorage.getItem('dockpanel-host') || '')
+  const [hostId, setHostIdState] = useState(() => prefGet('host') || '')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,17 +35,17 @@ export function HostProvider({ children }: { children: ReactNode }) {
       .then((data) => {
         const merged = data.hosts || []
         setHosts(merged)
-        const saved = localStorage.getItem('dockpanel-host')
+        const saved = prefGet('host')
         const pick =
           merged.find((h) => h.id === saved) ||
           merged.find((h) => h.id === data.defaultHost) ||
           merged[0]
         if (pick) {
           setHostIdState(pick.id)
-          localStorage.setItem('dockpanel-host', pick.id)
+          prefSet('host', pick.id)
         } else {
           setHostIdState('')
-          localStorage.removeItem('dockpanel-host')
+          prefRemove('host')
         }
       })
       .catch(() => setHosts([]))
@@ -53,7 +54,7 @@ export function HostProvider({ children }: { children: ReactNode }) {
 
   function setHostId(id: string) {
     setHostIdState(id)
-    localStorage.setItem('dockpanel-host', id)
+    prefSet('host', id)
   }
 
   const current = hosts.find((h) => h.id === hostId)

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/tgmsg"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/tgmsg"
 
 	"github.com/docker/docker/api/types/container"
 )

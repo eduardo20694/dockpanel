@@ -4,10 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import { useNav } from '../context/NavContext'
 import ThemeToggle from './ThemeToggle'
 import HostSwitcher from './HostSwitcher'
+import { useCommandPalette } from './CommandPalette'
 
 const titles: Record<string, string> = {
   '/': 'Painel',
+  '/broke': 'Algo quebrou',
   '/problems': 'Erros',
+  '/settings': 'Organização',
   '/stacks': 'Stacks',
   '/security': 'Segurança',
   '/containers': 'Containers',
@@ -26,6 +29,7 @@ export default function TopBar() {
   const { hostLabel } = useHost()
   const { user, authEnabled, logout } = useAuth()
   const { toggle, open } = useNav()
+  const palette = useCommandPalette()
   const path = location.pathname
   const base = path.includes('/investigate/')
     ? 'Investigação'
@@ -47,6 +51,10 @@ export default function TopBar() {
         <span className="text-text font-semibold truncate">{base}</span>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <button type="button" className="btn-outline btn-sm hidden sm:inline-flex items-center gap-2" onClick={palette.open}>
+          Buscar
+          <span className="kbd">⌘K</span>
+        </button>
         <HostSwitcher />
         <ThemeToggle />
         {authEnabled && user && (

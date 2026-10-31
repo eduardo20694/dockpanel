@@ -1,11 +1,16 @@
 import type { ContainerSummary, ImageSummary, VolumeSummary, NetworkSummary, NetworkInspect, StatFrame } from '../types'
+import { prefGet } from '../lib/prefs'
 
 const BASE = '/api'
 
+function selectedHost() {
+  return prefGet('host')
+}
+
 function hostHeaders(): Record<string, string> {
-  const host = localStorage.getItem('dockpanel-host')
+  const host = selectedHost()
   const h: Record<string, string> = {}
-  if (host && host !== 'default' && host !== 'all') h['X-Dockpanel-Host'] = host
+  if (host && host !== 'default' && host !== 'all') h['X-Dockerpilot-Host'] = host
   return h
 }
 
@@ -24,18 +29,19 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
 function wsUrl(path: string) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const host = localStorage.getItem('dockpanel-host')
+  const host = selectedHost()
   const q = host && host !== 'default' && host !== 'all' ? `?host=${encodeURIComponent(host)}` : ''
   return `${proto}://${window.location.host}${BASE}${path}${q}`
 }
 
 function isAllHosts() {
-  return localStorage.getItem('dockpanel-host') === 'all'
+  return selectedHost() === 'all'
 }
 
 export const api = {
   auth: {
     config: () => request<{ enabled: boolean }>('/auth/config'),
+    sso: () => request<{ enabled: boolean; issuer?: string; clientId?: string; mode?: string }>('/auth/sso'),
     me: () => request<{ user: AuthUser | null }>('/auth/me'),
     login: (email: string, password: string) =>
       request<{ user: AuthUser }>('/auth/login', {
@@ -76,7 +82,7 @@ export const api = {
     investigate: (id: string) => request<any>(`/containers/${id}/investigate`),
     history: (id: string) => request<any>(`/containers/${id}/history`),
     logsUrl: (id: string) => {
-      const host = localStorage.getItem('dockpanel-host')
+      const host = selectedHost()
       const q = new URLSearchParams({ follow: 'true' })
       if (host && host !== 'default' && host !== 'all') q.set('host', host)
       return `${BASE}/containers/${id}/logs?${q}`
@@ -105,6 +111,10 @@ export const api = {
     info: () => request<any>('/system/info'),
     df: () => request<any>('/system/df'),
     problems: () => request<any[]>('/system/problems'),
+    resolvedProblems: () => request<{ resolved: any[] }>('/system/problems/resolved'),
+    resolveProblem: (body: { containerId: string; name?: string; reason: string }) =>
+      request('/system/problems/resolve', { method: 'POST', body: JSON.stringify(body) }),
+    readonly: () => request<{ readOnly: boolean }>('/system/readonly'),
     safePrune: () => request<any>('/system/safe-prune'),
     drift: (path: string) => request<any>(`/system/drift?path=${encodeURIComponent(path)}`),
     driftDeep: (path: string) => request<any>(`/system/drift/deep?path=${encodeURIComponent(path)}`),
@@ -137,9 +147,9 @@ export const api = {
       if (opts?.window) q.set('window', opts.window)
       return request<{ incidents: any[] }>(`/logs/incidents?${q}`)
     },
-    retention: () => request<{ days: number; maxDays: number }>('/logs/retention'),
+    retention: () => request<{ days: number; maxDays: number }>('/logs/incidents/retention'),
     setRetention: (days: number) =>
-      request<{ days: number; maxDays: number }>('/logs/retention', {
+      request<{ days: number; maxDays: number }>('/logs/incidents/retention', {
         method: 'PUT',
         body: JSON.stringify({ days }),
       }),
@@ -165,6 +175,27 @@ export const api = {
         `/deploy/compose/status${path ? `?path=${encodeURIComponent(path)}` : ''}`,
       ),
   },
+  triage: {
+    get: () => request<TriageReport>('/triage'),
+  },
+  orgs: {
+    list: () => request<{ orgs: { id: string; name: string; slug: string }[] }>('/orgs'),
+  },
+  users: {
+    list: () => request<{ users: DirectoryUser[] }>('/users'),
+    create: (body: { email: string; name: string; password: string; role: string; orgId?: string }) =>
+      request<{ user: DirectoryUser }>('/users', { method: 'POST', body: JSON.stringify(body) }),
+  },
+  teams: {
+    list: () => request<{ teams: { id: string; name: string; orgId: string }[]; memberships: any[] }>('/teams'),
+    create: (name: string) => request('/teams', { method: 'POST', body: JSON.stringify({ name }) }),
+  },
+  audit: {
+    list: () => request<{ events: { at: string; actor?: string; action: string; status?: number }[] }>('/audit'),
+  },
+  cost: {
+    summary: () => request<{ usdPerDay: number; note: string; items: { name: string; usdPerDay: number; cpuCores: number; memGB: number }[] }>('/insights/cost'),
+  },
 }
 
 export interface AuthUser {
@@ -172,6 +203,33 @@ export interface AuthUser {
   email: string
   name: string
   role: string
+  orgId?: string
+}
+
+export interface DirectoryUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  orgId?: string
+  source?: string
+}
+
+export interface TriageReport {
+  suggestion: 'rollback' | 'restart' | 'none' | string
+  suggestionReason?: string
+  previousTag?: string
+  story: string
+  runningTag?: string
+  lastShip?: { at: string; tag?: string } | null
+  startedAt?: string
+  health?: string
+  restartCount: number
+  oomKilled: boolean
+  criticalCount: number
+  warningCount: number
+  incidents?: { startMs: number; endMs: number; containers?: string[]; entryCount: number; sampleLines?: string[] }[]
+  problems?: { containerId: string; name: string; reason: string }[]
 }
 
 export interface ServiceStatus {

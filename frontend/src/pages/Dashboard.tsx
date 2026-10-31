@@ -66,8 +66,8 @@ export default function Dashboard() {
               <h1 className="font-display font-bold text-3xl md:text-4xl tracking-tight text-text mb-2">
                 {hostLabel}
               </h1>
-              <p className="text-text-muted text-[15px] max-w-lg">
-                Painel Docker self-hosted: diagnóstico, segurança, stacks e deploy no mesmo host.
+              <p className="text-text-muted text-[15px] max-w-lg leading-relaxed">
+                Dockpilot no mesmo host do Docker: diagnóstico, segurança, stacks e o que fazer quando algo quebra.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 shrink-0">

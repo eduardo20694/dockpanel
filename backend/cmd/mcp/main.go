@@ -8,8 +8,12 @@ import (
 	"log"
 	"strings"
 
-	"dockpanel/internal/deploy"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/audit"
+	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/envx"
+	"dockerpilot/internal/org"
+	"dockerpilot/internal/resolved"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
@@ -44,7 +48,14 @@ func main() {
 		}
 	}
 
-	s := server.NewMCPServer("dockpanel", "0.1.0")
+	dataDir := envx.DataDir()
+	orgs, _ := org.Open(dataDir)
+	aud, _ := audit.Open(dataDir)
+	resolvedStore, _ := resolved.Open(dataDir)
+
+	s := server.NewMCPServer("dockpilot", "1.1.0",
+		server.WithInstructions("Dockpilot opera o Docker Engine (socket ou ssh://) sem exigir Portainer. Leia dockpilot_guidance se hesitar. Prefira ferramentas de leitura antes de escrever. DOCKERPILOT_READONLY bloqueia escritas de propósito. Não invente host_id: chame list_environments. Para 'o que quebrou' use what_broke. kubernetes_proxy só existe se DOCKERPILOT_K8S_API estiver definido."),
+	)
 
 	registerListContainers(s, pool)
 	registerContainerAction(s, pool)
@@ -65,6 +76,7 @@ func main() {
 	registerSecurityAuditTool(s, pool)
 	registerDeepDriftTool(s, pool)
 	registerSearchLogs(s)
+	registerProductTools(s, pool, orgs, aud, resolvedStore)
 
 	if err := server.ServeStdio(s); err != nil {
 		log.Fatalf("erro no servidor MCP: %v", err)
@@ -113,6 +125,9 @@ func registerContainerAction(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		dc, err := hostClient(pool, hostIDFrom(req, pool))
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -342,6 +357,9 @@ func registerRemoveResource(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		dc, err := hostClient(pool, hostIDFrom(req, pool))
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -410,6 +428,9 @@ func registerDeployCompose(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("detach", mcp.Description("true/false — incluir -d no up (padrão true para up)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		hostID := req.GetString("host_id", pool.DefaultID())
 		dockerHost := dockerHostFor(pool, hostID)
 		path := strings.TrimSpace(req.GetString("project_path", ""))

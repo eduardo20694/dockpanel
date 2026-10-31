@@ -1,8 +1,8 @@
 package main
 
 import (
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )

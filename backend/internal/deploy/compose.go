@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"dockerpilot/internal/envx"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -59,7 +60,7 @@ type Preset struct {
 // DefaultComposePath devolve a pasta do compose (env ou descoberta a partir do cwd).
 // Não usa path hardcoded — evita 502 em máquinas sem /root/dockpanel.
 func DefaultComposePath() string {
-	if p := strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH")); p != "" {
+	if p := strings.TrimSpace(envx.Get("COMPOSE_PATH")); p != "" {
 		return p
 	}
 	return discoverComposePath()
