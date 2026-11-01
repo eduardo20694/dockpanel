@@ -17,19 +17,21 @@ import (
 	"dockerpilot/internal/resolved"
 	"dockerpilot/internal/triage"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func registerProductTools(s *server.MCPServer, pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store) {
-	registerWhatBroke(s)
+	registerWhatBroke(s, pool)
 	registerResolveProblem(s, resolvedStore)
 	registerListEnvironments(s, pool)
 	registerUsersAndTeams(s, orgs)
 	registerStackWrite(s)
 	registerProxies(s, pool)
 	registerAuditTool(s, aud)
-	registerCostTool(s)
+	registerCostTool(s, pool)
 	registerGuidance(s)
 }
 
@@ -52,15 +54,43 @@ Ordem sugerida:
 	})
 }
 
-func registerWhatBroke(s *server.MCPServer) {
+func registerWhatBroke(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("what_broke",
 		mcp.WithDescription("Responde 'o que quebrou' neste host: último ship (last-ship.json), restarts, OOM, problemas e incidentes do Log Center, e sugere rollback, restart ou nada a fazer. Use depois de um deploy. Não reinicia nem faz rollback — só recomenda. Para aplicar, use rollback_stack ou container_action."),
 		mcp.WithString("host_id", mcp.Description("id do ambiente (list_environments). Vazio usa o host padrão.")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		host := req.GetString("host_id", "default")
+		host := req.GetString("host_id", "")
+		if host == "" {
+			host = pool.DefaultID()
+		}
 		ship, _ := triage.LoadShipFromHost(envx.DataDir(), host)
-		rep := triage.Build(ship, triage.Signals{Now: time.Now()})
+		sig := triage.Signals{Now: time.Now()}
+		if eng, _, err := diagnosticsFor(pool, host); err == nil {
+			if problems, err := eng.ScanProblems(ctx); err == nil {
+				for _, p := range problems {
+					sig.Problems = append(sig.Problems, triage.ProblemBrief{
+						ContainerID: p.ContainerID, Name: p.Name, Reason: p.Reason, Severity: string(p.Severity),
+					})
+					if string(p.Severity) == "critical" {
+						sig.CriticalCount++
+					} else {
+						sig.WarningCount++
+					}
+					if p.OOMKilled {
+						sig.OOMKilled = true
+					}
+					if p.RestartCount > sig.RestartCount {
+						sig.RestartCount = p.RestartCount
+					}
+				}
+			} else {
+				sig.DockerNote = err.Error()
+			}
+		} else {
+			sig.DockerNote = err.Error()
+		}
+		rep := triage.Build(ship, sig)
 		raw, _ := json.MarshalIndent(rep, "", "  ")
 		return mcp.NewToolResultText(string(raw)), nil
 	})
@@ -406,13 +436,31 @@ func registerAuditTool(s *server.MCPServer, aud *audit.Log) {
 	})
 }
 
-func registerCostTool(s *server.MCPServer) {
+func registerCostTool(s *server.MCPServer, pool *dockerclient.Pool) {
 	tool := mcp.NewTool("cost_insights",
 		mcp.WithDescription("Estima USD/dia a partir de reservas de CPU e memória e das taxas DOCKERPILOT_CPU_USD_HOUR e DOCKERPILOT_MEM_GB_USD_HOUR. É uma estimativa para conversa com a organização, não uma fatura de cloud. Somente leitura. Sem reservas configuradas o valor daquele container é zero."),
+		mcp.WithString("host_id", mcp.Description("ambiente")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		sum := cost.FromReservations(nil, cost.RatesFromEnv())
+		var rows []cost.Reservation
+		if dc, err := hostClient(pool, hostIDFrom(req, pool)); err == nil {
+			list, err := dc.CLI.ContainerList(ctx, dockerContainer.ListOptions{All: true})
+			if err == nil {
+				for _, c := range list {
+					info, err := dc.CLI.ContainerInspect(ctx, c.ID)
+					if err != nil || info.HostConfig == nil {
+						continue
+					}
+					name := shortID(c.ID)
+					if len(c.Names) > 0 {
+						name = strings.TrimPrefix(c.Names[0], "/")
+					}
+					rows = append(rows, cost.Reservation{Name: name, NanoCPUs: info.HostConfig.NanoCPUs, MemoryBytes: info.HostConfig.Memory})
+				}
+			}
+		}
+		sum := cost.FromReservations(rows, cost.RatesFromEnv())
 		raw, _ := json.MarshalIndent(sum, "", "  ")
-		return mcp.NewToolResultText(string(raw) + "\nPara o detalhe por container use GET /api/insights/cost no painel (precisa do daemon)."), nil
+		return mcp.NewToolResultText(string(raw)), nil
 	})
 }

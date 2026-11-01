@@ -196,6 +196,22 @@ export const api = {
   cost: {
     summary: () => request<{ usdPerDay: number; note: string; items: { name: string; usdPerDay: number; cpuCores: number; memGB: number }[] }>('/insights/cost'),
   },
+  billing: {
+    status: () => request<{
+      subscription: { plan: string; seats: number; status: string }
+      used: number
+      provider: string
+      plans: { id: string; name: string; seats: number | string; blurb: string }[]
+    }>('/billing'),
+    checkout: (plan: string, seats: number) =>
+      request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan, seats }) }),
+  },
+  apiKeys: {
+    list: () => request<{ keys: { id: string; name: string; prefix: string; role: string; userId: string; revokedAt?: string; lastUsedAt?: string; expiresAt?: string }[] }>('/api-keys'),
+    create: (body: { name: string; role?: string; userId?: string; ttlDays?: number }) =>
+      request<{ token: string; key: { id: string; prefix: string } }>('/api-keys', { method: 'POST', body: JSON.stringify(body) }),
+    revoke: (id: string) => request<{ ok: boolean }>(`/api-keys/${id}`, { method: 'DELETE' }),
+  },
 }
 
 export interface AuthUser {

@@ -93,6 +93,25 @@ async function mockApi(page: Page, opts?: { anonymous?: boolean }) {
     if (p.endsWith('/teams')) return json({ teams: [{ id: 't1', name: 'Plataforma', orgId: 'default' }], memberships: [] })
     if (p.endsWith('/audit')) return json({ events: [{ at: new Date().toISOString(), actor: 'ana@org.dev', action: 'POST /api/stacks/rollback', status: 200 }] })
     if (p.endsWith('/insights/cost')) return json({ usdPerDay: 1.2, note: 'estimativa', items: [{ name: 'api', usdPerDay: 1.2, cpuCores: 1, memGB: 2 }] })
+    if (p.endsWith('/billing') && method === 'GET') {
+      return json({
+        subscription: { plan: 'individual', seats: 1, status: 'active' },
+        used: 1,
+        provider: 'stripe',
+        plans: [
+          { id: 'individual', name: 'Individual', seats: 1, blurb: 'Um operador' },
+          { id: 'organization', name: 'Organização', seats: 'por assento', blurb: 'Time' },
+        ],
+      })
+    }
+    if (p.endsWith('/billing/checkout')) return json({ url: 'https://checkout.stripe.com/c/pay/cs_test_dockpilot' })
+    if (p.endsWith('/api-keys') && method === 'GET') {
+      return json({ keys: [{ id: 'k1', name: 'Claude', prefix: 'dp_live_ab12', role: 'admin', userId: 'admin' }] })
+    }
+    if (p.endsWith('/api-keys') && method === 'POST') {
+      return json({ token: 'dp_live_secret_once', key: { id: 'k2', prefix: 'dp_live_secr' } })
+    }
+    if (p.includes('/api-keys/') && method === 'DELETE') return json({ ok: true })
     if (p.endsWith('/deploy/presets')) return json({ dockerHost: '', presets: [] })
     return json({})
   })
@@ -126,6 +145,10 @@ const tour: [string, string, string][] = [
   ['/cleanup', 'Limpeza', 'cleanup'],
   ['/deploy', 'Deploy', 'deploy'],
   ['/settings', 'Organização', 'settings'],
+  ['/billing', 'Cobrança', 'billing'],
+  ['/seats', 'Assentos', 'seats'],
+  ['/chaves', 'Chaves de API', 'api-keys'],
+  ['/pricing', 'Preços', 'pricing'],
 ]
 
 test('login e entrada', async ({ page }) => {
@@ -171,6 +194,13 @@ test('telas principais nos dois temas', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await shot(page, file)
   }
+
+  await page.goto('/billing')
+  await page.getByRole('button', { name: 'Abrir checkout' }).click()
+  await expect(page.getByText('checkout.stripe.com')).toBeVisible()
+  await page.goto('/chaves')
+  await page.getByRole('button', { name: 'Gerar chave' }).click()
+  await expect(page.getByText('dp_live_secret_once')).toBeVisible()
 
   await page.goto('/problems')
   await page.getByRole('button', { name: 'Marcar resolvido', exact: true }).click()

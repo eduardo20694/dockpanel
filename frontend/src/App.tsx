@@ -25,6 +25,7 @@ import Metrics from './pages/Metrics'
 import LogCenter from './pages/LogCenter'
 import Broke from './pages/Broke'
 import Settings from './pages/Settings'
+import Billing, { APIKeys, Pricing, Seats } from './pages/Billing'
 import { CommandPaletteProvider } from './components/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -81,6 +82,10 @@ function AppRoutes() {
         <Route path="/broke" element={<Broke />} />
         <Route path="/problems" element={<Problems />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/billing" element={<Billing />} />
+        <Route path="/seats" element={<Seats />} />
+        <Route path="/chaves" element={<APIKeys />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/stacks" element={<Stacks />} />
         <Route path="/security" element={<Security />} />
         <Route path="/alerts" element={<Alerts />} />

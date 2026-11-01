@@ -31,6 +31,10 @@ const groups = [
     items: [
       { to: '/deploy', label: 'Deploy', icon: RocketIcon },
       { to: '/settings', label: 'Organização', icon: ShieldIcon },
+      { to: '/billing', label: 'Cobrança', icon: ChartIcon },
+      { to: '/seats', label: 'Assentos', icon: StackIcon },
+      { to: '/chaves', label: 'Chaves', icon: ShieldIcon },
+      { to: '/pricing', label: 'Preços', icon: ChartIcon },
     ],
   },
 ]

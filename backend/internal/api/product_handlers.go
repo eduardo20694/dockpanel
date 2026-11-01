@@ -16,6 +16,7 @@ import (
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/proxy"
 	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/seats"
 	"dockerpilot/internal/triage"
 
 	"github.com/docker/docker/api/types/container"
@@ -165,6 +166,19 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, `{"error":"json inválido"}`, http.StatusBadRequest)
 		return
+	}
+	orgID := body.OrgID
+	if orgID == "" {
+		orgID = "default"
+	}
+	if s.Seats != nil {
+		members := 1 + len(s.Orgs.Users(orgID))
+		if err := s.Seats.Ensure(orgID, members); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": seats.ErrSeatLimit.Error()})
+			return
+		}
 	}
 	u, err := s.Orgs.CreateUser(body.Email, body.Name, body.Password, body.Role, body.OrgID)
 	if err != nil {

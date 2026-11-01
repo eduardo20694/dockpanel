@@ -66,6 +66,7 @@ func isPublicRoute(path string) bool {
 	switch path {
 	case "/api/health", "/api/health/detailed", "/api/openapi.json",
 		"/api/auth/login", "/api/auth/config", "/api/auth/sso", "/api/auth/sso/exchange",
+		"/api/billing/webhook",
 		"/api/auth/me", "/api/auth/logout",
 		"/api/client-errors":
 		return true

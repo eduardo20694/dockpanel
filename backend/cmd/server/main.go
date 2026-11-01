@@ -11,8 +11,10 @@ import (
 
 	"dockerpilot/internal/alerts"
 	"dockerpilot/internal/api"
+	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
+	"dockerpilot/internal/billing"
 	"dockerpilot/internal/collector"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
@@ -20,6 +22,7 @@ import (
 	"dockerpilot/internal/observability"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/seats"
 	"dockerpilot/internal/store"
 	"dockerpilot/internal/telegram"
 
@@ -104,6 +107,18 @@ func main() {
 	} else {
 		resolvedStore = rs
 	}
+	var keys *apikey.Store
+	if ks, err := apikey.Open(dataDir); err != nil {
+		log.Printf("aviso: chaves MCP desabilitadas: %v", err)
+	} else {
+		keys = ks
+	}
+	var seatStore *seats.Store
+	if ss, err := seats.Open(dataDir); err != nil {
+		log.Printf("aviso: assentos desabilitados: %v", err)
+	} else {
+		seatStore = ss
+	}
 
 	notifier := alerts.NewFromEnv()
 	alerts.NewScanner(pool, notifier, st).Start(ctx)
@@ -122,6 +137,7 @@ func main() {
 	server := api.NewServerFromDeps(api.Deps{
 		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
 		Audit: auditLog, Orgs: orgs, Resolved: resolvedStore, DataDir: dataDir,
+		Keys: keys, Seats: seatStore, Billing: billing.StripeFromEnv(),
 	})
 
 	port := os.Getenv("PORT")

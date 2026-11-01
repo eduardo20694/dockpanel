@@ -6,13 +6,16 @@ import (
 	"reflect"
 	"strings"
 
+	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
+	"dockerpilot/internal/billing"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
 	"dockerpilot/internal/logcenter"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/seats"
 	"dockerpilot/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -28,6 +31,9 @@ type Server struct {
 	Audit    *audit.Log
 	Orgs     *org.Store
 	Resolved *resolved.Store
+	Keys     *apikey.Store
+	Seats    *seats.Store
+	Billing  billing.Provider
 	DataDir  string
 	Router   *chi.Mux
 }
@@ -40,6 +46,9 @@ type Deps struct {
 	Audit    *audit.Log
 	Orgs     *org.Store
 	Resolved *resolved.Store
+	Keys     *apikey.Store
+	Seats    *seats.Store
+	Billing  billing.Provider
 	DataDir  string
 }
 
@@ -50,6 +59,7 @@ func NewServerFromDeps(d Deps) *Server {
 	s := &Server{
 		Hosts: d.Hosts, Store: d.Store, LogStore: d.LogStore, Auth: d.Auth,
 		Audit: d.Audit, Orgs: d.Orgs, Resolved: d.Resolved, DataDir: d.DataDir,
+		Keys: d.Keys, Seats: d.Seats, Billing: d.Billing,
 		Router: chi.NewRouter(),
 	}
 	s.routes()
@@ -113,6 +123,12 @@ func (s *Server) routes() {
 	r.Get("/api/orgs", s.listOrgs)
 	r.Get("/api/users", s.listUsers)
 	r.Post("/api/users", s.createUser)
+	r.Get("/api/billing", s.billingStatus)
+	r.Post("/api/billing/checkout", s.billingCheckout)
+	r.Post("/api/billing/webhook", s.billingWebhook)
+	r.Get("/api/api-keys", s.listAPIKeys)
+	r.Post("/api/api-keys", s.createAPIKey)
+	r.Delete("/api/api-keys/{id}", s.revokeAPIKey)
 	r.Patch("/api/users/{id}", s.updateUser)
 	r.Get("/api/teams", s.listTeams)
 	r.Post("/api/teams", s.createTeam)
