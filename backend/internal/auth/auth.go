@@ -27,11 +27,15 @@ var (
 
 // User is an authenticated principal (env admin, directory user, or SSO).
 type User struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
-	Role  string `json:"role"`
-	OrgID string `json:"orgId,omitempty"`
+	ID     string   `json:"id"`
+	Email  string   `json:"email"`
+	Name   string   `json:"name"`
+	Role   string   `json:"role"`
+	OrgID  string   `json:"orgId,omitempty"`
+	KeyID  string   `json:"-"`
+	Stacks []string `json:"-"`
+	Hosts  []string `json:"-"`
+	Guest  bool     `json:"-"`
 }
 
 type Claims struct {

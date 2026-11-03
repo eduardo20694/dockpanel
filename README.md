@@ -25,7 +25,20 @@ Não reimplementamos Edge, Helm nem o catálogo inteiro de ~380 rotas do Portain
 | Somente leitura | `PORTAINER_READ_ONLY` | `DOCKERPILOT_READONLY` (API e MCP) |
 | Proxy Docker | Sim, pelo endpoint Portainer | Sim, direto na Engine API, com guarda de path |
 | Proxy Kubernetes | Sim | Sim, se `DOCKERPILOT_K8S_API` existir; senão explica que não está configurado |
-| SSO | API key do Portainer | OIDC pronto (issuer, client id, HMAC para o gateway) |
+| SSO | API key do Portainer | OIDC (issuer, client id, HMAC ou gateway) |
+| Docker standalone | Pela API do Portainer | Socket ou `ssh://`, containers, compose, logs, terminal |
+| Docker Swarm | Pela API do Portainer | Nativo: nós, serviços, tasks, logs, secrets, configs, escala, rolling update, rollback e stacks |
+| Kubernetes | Proxy da API | Nativo: kubeconfig ou service account, vários clusters, workloads, pods, services, ingress, configmaps, secrets (só nomes), escala, rollout, undo, eventos, YAML, Helm e “o que quebrou” |
+
+## Frente a Arcane, Dockhand e Portainer
+
+| | Arcane | Dockhand | Portainer | Dockpilot |
+|---|---|---|---|---|
+| Foco | Painel Docker moderno | Painel Docker leve | Plataforma com Edge e Swarm/K8s pela UI | Operação e MCP no host |
+| Swarm | Parcial, quando exposto pela API | Não é o centro | Completo na UI | Completo na API, na UI e no MCP |
+| Kubernetes | Não é o produto | Não é o produto | UI e proxy | Cliente nativo, vários clusters, diagnóstico |
+| MCP | Não | Não | Portainer MCP, na frente do Portainer | MCP direto na Engine, no Swarm e no Kubernetes |
+| GitOps, cofre, chaves por pessoa | Não nesse formato | Não | Mais no Business | Sim, no mesmo binário |
 | “O que quebrou” | Não | `/broke` + `what_broke`: último ship, restarts, Log Center |
 | Auditoria de segurança | Não é o foco | Privileged, `:latest`, portas, root |
 | CVE | Não | Trivy |
@@ -111,6 +124,18 @@ cd backend && go build -o dockerpilot-mcp ./cmd/mcp
 ```
 
 Ferramentas novas em relação ao painel antigo: `list_environments`, `list_users`, `create_user`, `list_teams`, `create_team`, `add_team_member`, `create_stack`, `update_stack`, `rollback_stack`, `docker_proxy`, `kubernetes_proxy`, `what_broke`, `resolve_problem`, `list_audit`, `cost_insights`, `dockpilot_guidance`. As ferramentas de diagnóstico, Trivy, drift, prune, backup e logs continuam.
+
+## GitOps, cofre e atendimento
+
+Uma stack pode apontar para um repositório (URL, branch, caminho do compose e deploy key). O sync entra por webhook HMAC (GitHub ou GitLab) ou por polling, mostra o diff e aplica em modo automático ou com aprovação. Healthcheck ruim dispara rollback. O histórico cai na auditoria.
+
+Segredos ficam cifrados com AES-GCM. A chave mestra é `DOCKERPILOT_SECRETS_KEY`. O valor não volta na API. No deploy ele vira env ou arquivo. Compose com senha em texto ganha um aviso para migrar ao cofre.
+
+Imagens são conferidas no Docker Hub, GHCR ou registry privado. A atualização pode esperar aprovação ou seguir política automática, com rollback e notificação.
+
+Consultor entra com chave de poucas horas, escopo de stack e host, revogação imediata e linha do tempo. O terminal web (xterm.js) respeita papel e somente leitura e grava os comandos. O relatório de atendimento sai em Markdown e PDF. Templates (Postgres, Redis, Nginx+SSL, n8n, MySQL, MongoDB, Traefik, Grafana+Prometheus) sobem em um clique e mandam a senha para o cofre.
+
+As mesmas operações existem como tools MCP.
 
 ## Licença de uso
 

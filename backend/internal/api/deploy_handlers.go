@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 
 	"dockerpilot/internal/deploy"
 	"dockerpilot/internal/dockerclient"
@@ -49,6 +50,7 @@ func (s *Server) deployCompose(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.injectSecrets(r, filepath.Base(req.ProjectPath), &req)
 	res, err := deploy.RunCompose(r.Context(), req)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")

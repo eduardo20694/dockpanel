@@ -20,6 +20,9 @@ func toolGate(aud *audit.Log) server.ToolHandlerMiddleware {
 				if err := apikey.AllowTool(p, name); err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
+				if err := p.AllowsCall(name, req.GetString("host_id", ""), req.GetString("stack", "")); err != nil {
+					return mcp.NewToolResultError("fora do escopo desta chave"), nil
+				}
 				if apikey.IsMutating(name) && envx.ReadOnly() && name != "docker_proxy" && name != "kubernetes_proxy" {
 					return mcp.NewToolResultError("modo somente leitura"), nil
 				}

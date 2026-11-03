@@ -42,7 +42,7 @@ func TestLiveDockerTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := mustClient(t, buildMCP(pool, orgs, aud, res))
+	c := mustClient(t, buildMCP(pool, orgs, aud, res, Services{}))
 	calls := []struct {
 		name string
 		args map[string]any

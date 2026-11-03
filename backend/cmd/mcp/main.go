@@ -8,12 +8,17 @@ import (
 	"log"
 	"strings"
 
+	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/deploy"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
+	"dockerpilot/internal/gitops"
+	"dockerpilot/internal/kube"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/secrets"
+	"dockerpilot/internal/updates"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
@@ -52,8 +57,29 @@ func main() {
 	orgs, _ := org.Open(dataDir)
 	aud, _ := audit.Open(dataDir)
 	resolvedStore, _ := resolved.Open(dataDir)
+	keys, _ := apikey.Open(dataDir)
+	gitStore, _ := gitops.Open(dataDir)
+	sec, _ := secrets.Open(dataDir)
+	upd, _ := updates.Open(dataDir)
+	var kubeSources []kube.Source
+	for _, h := range pool.List() {
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
+		}
+	}
+	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
+	kubeSet := kube.Open(kubeSources)
+	if c, err := pool.Get(pool.DefaultID()); err == nil && c != nil && upd != nil {
+		upd.Engine = updates.NewDockerEngine(c.CLI)
+	}
+	if gitStore != nil {
+		gitStore.Start(ctx, aud)
+	}
+	if upd != nil {
+		upd.Start(ctx, aud)
+	}
 
-	s := buildMCP(pool, orgs, aud, resolvedStore)
+	s := buildMCP(pool, orgs, aud, resolvedStore, Services{Git: gitStore, Secrets: sec, Updates: upd, Keys: keys, Kube: kubeSet})
 
 	if addr := strings.TrimSpace(envx.Get("MCP_ADDR")); addr != "" {
 		if err := serveHTTP(addr, s, dataDir, aud); err != nil {
@@ -66,7 +92,7 @@ func main() {
 	}
 }
 
-func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store) *server.MCPServer {
+func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store, svc Services) *server.MCPServer {
 	s := server.NewMCPServer("dockpilot", "1.1.0",
 		server.WithInstructions("Dockpilot opera o Docker Engine (socket ou ssh://) sem exigir Portainer. Leia dockpilot_guidance se hesitar. Prefira ferramentas de leitura antes de escrever. DOCKERPILOT_READONLY bloqueia escritas de propósito. Não invente host_id: chame list_environments. Para 'o que quebrou' use what_broke. kubernetes_proxy só existe se DOCKERPILOT_K8S_API estiver definido."),
 		server.WithToolHandlerMiddleware(toolGate(aud)),
@@ -93,6 +119,8 @@ func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolved
 	registerSearchLogs(s)
 	registerProductTools(s, pool, orgs, aud, resolvedStore)
 	registerCoverageTools(s, pool)
+	registerPlatformTools(s, pool, aud, svc)
+	registerOrchestratorTools(s, pool, svc.Kube)
 	return s
 }
 

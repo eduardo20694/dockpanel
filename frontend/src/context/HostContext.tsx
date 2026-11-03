@@ -6,6 +6,7 @@ export interface DockerHost {
   id: string
   label: string
   dockerHost: string
+  kind?: string
 }
 
 interface HostContextValue {
@@ -14,6 +15,7 @@ interface HostContextValue {
   setHostId: (id: string) => void
   loading: boolean
   hostLabel: string
+  hostKind: string
 }
 
 const HostContext = createContext<HostContextValue>({
@@ -22,6 +24,7 @@ const HostContext = createContext<HostContextValue>({
   setHostId: () => {},
   loading: true,
   hostLabel: 'Host',
+  hostKind: 'docker',
 })
 
 export function HostProvider({ children }: { children: ReactNode }) {
@@ -59,9 +62,10 @@ export function HostProvider({ children }: { children: ReactNode }) {
 
   const current = hosts.find((h) => h.id === hostId)
   const hostLabel = current?.label || current?.id || 'Host'
+  const hostKind = current?.kind || 'docker'
 
   return (
-    <HostContext.Provider value={{ hosts, hostId, setHostId, loading, hostLabel }}>
+    <HostContext.Provider value={{ hosts, hostId, setHostId, loading, hostLabel, hostKind }}>
       {children}
     </HostContext.Provider>
   )

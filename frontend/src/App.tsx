@@ -25,7 +25,15 @@ import Metrics from './pages/Metrics'
 import LogCenter from './pages/LogCenter'
 import Broke from './pages/Broke'
 import Settings from './pages/Settings'
-import Billing, { APIKeys, Pricing, Seats } from './pages/Billing'
+import APIKeys from './pages/APIKeys'
+import GitOps from './pages/GitOps'
+import Secrets from './pages/Secrets'
+import Updates from './pages/Updates'
+import Access from './pages/Access'
+import Templates from './pages/Templates'
+import Report from './pages/Report'
+import Swarm from './pages/Swarm'
+import Kubernetes from './pages/Kubernetes'
 import { CommandPaletteProvider } from './components/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -82,11 +90,16 @@ function AppRoutes() {
         <Route path="/broke" element={<Broke />} />
         <Route path="/problems" element={<Problems />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/billing" element={<Billing />} />
-        <Route path="/seats" element={<Seats />} />
         <Route path="/chaves" element={<APIKeys />} />
-        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/gitops" element={<GitOps />} />
+        <Route path="/segredos" element={<Secrets />} />
+        <Route path="/atualizacoes" element={<Updates />} />
+        <Route path="/acesso" element={<Access />} />
+        <Route path="/templates" element={<Templates />} />
+        <Route path="/relatorio" element={<Report />} />
         <Route path="/stacks" element={<Stacks />} />
+        <Route path="/swarm" element={<Swarm />} />
+        <Route path="/kubernetes" element={<Kubernetes />} />
         <Route path="/security" element={<Security />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/containers" element={<Containers />} />

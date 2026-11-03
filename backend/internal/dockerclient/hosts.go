@@ -12,7 +12,10 @@ import (
 type HostConfig struct {
 	ID         string `json:"id"`
 	Label      string `json:"label"`
+	Kind       string `json:"kind,omitempty"`
 	DockerHost string `json:"dockerHost"`
+	Kubeconfig string `json:"kubeconfig,omitempty"`
+	Context    string `json:"context,omitempty"`
 }
 
 type Pool struct {
@@ -55,8 +58,15 @@ func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 		clis:      make(map[string]*Client),
 		defaultID: defaultID,
 	}
-	for _, h := range hosts {
+	for i := range p.hosts {
+		if p.hosts[i].Kind == "" {
+			p.hosts[i].Kind = "docker"
+		}
+		h := p.hosts[i]
 		p.baseline[h.ID] = h
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			continue
+		}
 		cli, err := newWithHost(h.DockerHost)
 		if err != nil {
 			return nil, fmt.Errorf("host %q: %w", h.ID, err)

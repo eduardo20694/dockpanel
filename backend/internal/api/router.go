@@ -9,14 +9,16 @@ import (
 	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
-	"dockerpilot/internal/billing"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
+	"dockerpilot/internal/gitops"
+	"dockerpilot/internal/kube"
 	"dockerpilot/internal/logcenter"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
-	"dockerpilot/internal/seats"
+	"dockerpilot/internal/secrets"
 	"dockerpilot/internal/store"
+	"dockerpilot/internal/updates"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -32,8 +34,10 @@ type Server struct {
 	Orgs     *org.Store
 	Resolved *resolved.Store
 	Keys     *apikey.Store
-	Seats    *seats.Store
-	Billing  billing.Provider
+	GitOps   *gitops.Store
+	Secrets  *secrets.Store
+	Updates  *updates.Service
+	Kube     *kube.Set
 	DataDir  string
 	Router   *chi.Mux
 }
@@ -47,8 +51,10 @@ type Deps struct {
 	Orgs     *org.Store
 	Resolved *resolved.Store
 	Keys     *apikey.Store
-	Seats    *seats.Store
-	Billing  billing.Provider
+	GitOps   *gitops.Store
+	Secrets  *secrets.Store
+	Updates  *updates.Service
+	Kube     *kube.Set
 	DataDir  string
 }
 
@@ -59,7 +65,7 @@ func NewServerFromDeps(d Deps) *Server {
 	s := &Server{
 		Hosts: d.Hosts, Store: d.Store, LogStore: d.LogStore, Auth: d.Auth,
 		Audit: d.Audit, Orgs: d.Orgs, Resolved: d.Resolved, DataDir: d.DataDir,
-		Keys: d.Keys, Seats: d.Seats, Billing: d.Billing,
+		Keys: d.Keys, GitOps: d.GitOps, Secrets: d.Secrets, Updates: d.Updates, Kube: d.Kube,
 		Router: chi.NewRouter(),
 	}
 	s.routes()
@@ -106,6 +112,39 @@ func (s *Server) routes() {
 	r.Get("/api/auth/me", s.authMe)
 
 	r.Get("/api/hosts", s.listHosts)
+	r.Get("/api/swarm/nodes", s.swarmNodes)
+	r.Get("/api/swarm/services", s.swarmServices)
+	r.Post("/api/swarm/services/{name}/scale", s.swarmScale)
+	r.Post("/api/swarm/services/{name}/update", s.swarmUpdate)
+	r.Post("/api/swarm/services/{name}/rollback", s.swarmRollback)
+	r.Get("/api/swarm/services/{name}/tasks", s.swarmTasks)
+	r.Get("/api/swarm/services/{name}/logs", s.swarmLogs)
+	r.Get("/api/swarm/secrets", s.swarmSecrets)
+	r.Post("/api/swarm/secrets", s.swarmSecretCreate)
+	r.Delete("/api/swarm/secrets/{id}", s.swarmSecretDelete)
+	r.Get("/api/swarm/configs", s.swarmConfigs)
+	r.Post("/api/swarm/configs", s.swarmConfigCreate)
+	r.Delete("/api/swarm/configs/{id}", s.swarmConfigDelete)
+	r.Get("/api/swarm/stacks", s.swarmStacks)
+	r.Post("/api/swarm/stacks", s.swarmStackDeploy)
+	r.Delete("/api/swarm/stacks/{name}", s.swarmStackRemove)
+	r.Get("/api/k8s/namespaces", s.k8sNamespaces)
+	r.Get("/api/k8s/workloads", s.k8sWorkloads)
+	r.Get("/api/k8s/pods", s.k8sPods)
+	r.Get("/api/k8s/pods/{namespace}/{name}/logs", s.k8sPodLogs)
+	r.Post("/api/k8s/pods/{namespace}/{name}/exec", s.k8sPodExec)
+	r.Post("/api/k8s/pods/{namespace}/{name}/restart", s.k8sPodRestart)
+	r.Get("/api/k8s/services", s.k8sServices)
+	r.Get("/api/k8s/ingresses", s.k8sIngresses)
+	r.Get("/api/k8s/configmaps", s.k8sConfigMaps)
+	r.Get("/api/k8s/secrets", s.k8sSecrets)
+	r.Post("/api/k8s/scale", s.k8sScale)
+	r.Post("/api/k8s/rollout", s.k8sRollout)
+	r.Post("/api/k8s/undo", s.k8sUndo)
+	r.Get("/api/k8s/events", s.k8sEvents)
+	r.Get("/api/k8s/broke", s.k8sBroke)
+	r.Post("/api/k8s/apply", s.k8sApply)
+	r.Post("/api/k8s/helm", s.k8sHelm)
 	r.Get("/api/metrics/series", s.metricsSeries)
 	r.Get("/api/metrics/host", s.metricsHost)
 	r.Get("/api/history/alerts", s.listAlertHistory)
@@ -123,12 +162,33 @@ func (s *Server) routes() {
 	r.Get("/api/orgs", s.listOrgs)
 	r.Get("/api/users", s.listUsers)
 	r.Post("/api/users", s.createUser)
-	r.Get("/api/billing", s.billingStatus)
-	r.Post("/api/billing/checkout", s.billingCheckout)
-	r.Post("/api/billing/webhook", s.billingWebhook)
 	r.Get("/api/api-keys", s.listAPIKeys)
 	r.Post("/api/api-keys", s.createAPIKey)
 	r.Delete("/api/api-keys/{id}", s.revokeAPIKey)
+	r.Get("/api/gitops", s.gitopsStatus)
+	r.Put("/api/gitops", s.gitopsGlobal)
+	r.Put("/api/gitops/stacks/{stack}", s.gitopsUpsert)
+	r.Post("/api/gitops/stacks/{stack}/sync", s.gitopsSync)
+	r.Post("/api/gitops/stacks/{stack}/approve", s.gitopsApprove)
+	r.Get("/api/gitops/stacks/{stack}/diff", s.gitopsDiff)
+	r.Post("/api/gitops/webhook", s.gitopsWebhook)
+	r.Get("/api/secrets", s.listSecrets)
+	r.Put("/api/secrets", s.putSecret)
+	r.Delete("/api/secrets/{id}", s.deleteSecret)
+	r.Post("/api/secrets/scan", s.scanSecrets)
+	r.Get("/api/updates", s.updatesStatus)
+	r.Put("/api/updates/policy", s.updatesPolicy)
+	r.Post("/api/updates/check", s.updatesCheck)
+	r.Post("/api/updates/apply", s.updatesApply)
+	r.Get("/api/sessions", s.listSessions)
+	r.Post("/api/sessions", s.createSession)
+	r.Delete("/api/sessions/{id}", s.revokeSession)
+	r.Get("/api/sessions/{id}/timeline", s.sessionTimeline)
+	r.Get("/api/templates", s.listTemplates)
+	r.Post("/api/templates/{id}/deploy", s.deployTemplate)
+	r.Post("/api/reports", s.createReport)
+	r.Get("/api/reports/{id}", s.getReport)
+	r.Get("/api/reports/{id}/pdf", s.getReportPDF)
 	r.Patch("/api/users/{id}", s.updateUser)
 	r.Get("/api/teams", s.listTeams)
 	r.Post("/api/teams", s.createTeam)

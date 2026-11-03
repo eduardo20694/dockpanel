@@ -83,13 +83,20 @@ Stdio no Cursor:
 }
 ```
 
-## Stripe (teste)
+## GitOps, cofre, imagens e atendimento
+
+O mesmo servidor MCP expõe `gitops_status`, `gitops_configure`, `gitops_sync`, `gitops_approve`, `secrets_list`, `secrets_put`, `secrets_scan`, `image_updates`, `apply_image_update`, `list_templates`, `deploy_template`, `create_guest_access`, `revoke_guest_access`, `session_timeline`, `render_report` e `container_exec`. Papel, escopo da chave e `DOCKERPILOT_READONLY` continuam valendo.
 
 ```env
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_INDIVIDUAL=price_...
-STRIPE_PRICE_SEAT=price_...
+DOCKERPILOT_SECRETS_KEY=uma-frase-ou-32-bytes
+DOCKERPILOT_REGISTRY_USER=
+DOCKERPILOT_REGISTRY_PASSWORD=
+DOCKERPILOT_REGISTRY_TOKEN=
 ```
 
-O webhook é `POST /api/billing/webhook`. Sem essas variáveis o checkout responde que a cobrança não está configurada; outro provedor entra no lugar da interface `billing.Provider`.
+O webhook de GitOps é `POST /api/gitops/webhook`, com `X-Hub-Signature-256` (GitHub) ou `X-Gitlab-Signature-256` / `X-Gitlab-Token` (GitLab).
+
+## Swarm e Kubernetes
+
+`host_id` escolhe o ambiente (`list_environments`). Swarm: `swarm_nodes`, `swarm_services`, `swarm_tasks`, `swarm_logs`, `swarm_scale`, `swarm_update`, `swarm_rollback`, `swarm_secrets`, `swarm_configs`, `swarm_stacks`, `swarm_stack_deploy`. Kubernetes: `k8s_namespaces`, `k8s_workloads`, `k8s_pods`, `k8s_pod_logs`, `k8s_what_broke`, `k8s_events`, `k8s_apply`, `k8s_scale`, `k8s_rollout`, `k8s_undo`. O cluster entra por `DOCKERPILOT_KUBECONFIG` ou por um host `kind: kubernetes` em `DOCKERPILOT_HOSTS`.
+

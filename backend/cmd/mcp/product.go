@@ -50,6 +50,7 @@ Ordem sugerida:
 5. Escritas (container_action, create_stack, update_stack, rollback_stack, docker_proxy POST) respeitam DOCKERPILOT_READONLY e devem ser confirmadas pelo operador.
 6. kubernetes_proxy só funciona com DOCKERPILOT_K8S_API. Se não estiver configurado, diga isso em vez de improvisar kubectl.
 7. list_audit mostra quem mudou o quê. create_user / create_team exigem papel de admin na API; aqui o processo MCP usa o diretório local.
+8. gitops_*, secrets_*, image_updates, list_templates, create_guest_access e render_report cobrem repo, cofre, imagem, acesso temporário e relatório. container_exec grava o comando. Chave com escopo precisa de host_id e stack.
 `)), nil
 	})
 }

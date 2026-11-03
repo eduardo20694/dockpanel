@@ -52,7 +52,7 @@ func TestMCPHTTPKeyAuth(t *testing.T) {
 	}
 	_ = viewKey
 
-	mcpSrv := buildMCP(pool, orgs, aud, res)
+	mcpSrv := buildMCP(pool, orgs, aud, res, Services{})
 	ts := httptest.NewServer(mcpHandler(mcpSrv, keys, aud))
 	defer ts.Close()
 

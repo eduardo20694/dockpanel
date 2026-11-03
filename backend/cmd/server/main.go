@@ -14,17 +14,19 @@ import (
 	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
-	"dockerpilot/internal/billing"
 	"dockerpilot/internal/collector"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
+	"dockerpilot/internal/gitops"
+	"dockerpilot/internal/kube"
 	"dockerpilot/internal/logcenter"
 	"dockerpilot/internal/observability"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
-	"dockerpilot/internal/seats"
+	"dockerpilot/internal/secrets"
 	"dockerpilot/internal/store"
 	"dockerpilot/internal/telegram"
+	"dockerpilot/internal/updates"
 
 	"github.com/joho/godotenv"
 )
@@ -113,14 +115,33 @@ func main() {
 	} else {
 		keys = ks
 	}
-	var seatStore *seats.Store
-	if ss, err := seats.Open(dataDir); err != nil {
-		log.Printf("aviso: assentos desabilitados: %v", err)
+	var gitStore *gitops.Store
+	if gs, err := gitops.Open(dataDir); err != nil {
+		log.Printf("aviso: gitops desabilitado: %v", err)
 	} else {
-		seatStore = ss
+		gitStore = gs
+		gitStore.Start(ctx, auditLog)
 	}
-
+	var secretStore *secrets.Store
+	if ss, err := secrets.Open(dataDir); err != nil {
+		log.Printf("aviso: cofre desabilitado: %v", err)
+	} else {
+		secretStore = ss
+	}
+	var updateSvc *updates.Service
+	if us, err := updates.Open(dataDir); err != nil {
+		log.Printf("aviso: atualizações desabilitadas: %v", err)
+	} else {
+		updateSvc = us
+		if c, err := pool.Get(pool.DefaultID()); err == nil && c != nil {
+			updateSvc.Engine = updates.NewDockerEngine(c.CLI)
+		}
+		updateSvc.Start(ctx, auditLog)
+	}
 	notifier := alerts.NewFromEnv()
+	if updateSvc != nil {
+		updateSvc.Notify = func(title, body string) { _ = notifier.SendSeverity("warning", title, body, nil) }
+	}
 	alerts.NewScanner(pool, notifier, st).Start(ctx)
 	telegram.NewFromEnv(pool, notifier).Start(ctx)
 	collector.New(pool, st).Start(ctx)
@@ -134,10 +155,19 @@ func main() {
 		defer logStore.Close()
 	}
 
+	var kubeSources []kube.Source
+	for _, h := range pool.List() {
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
+		}
+	}
+	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
+	kubeSet := kube.Open(kubeSources)
+
 	server := api.NewServerFromDeps(api.Deps{
 		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
 		Audit: auditLog, Orgs: orgs, Resolved: resolvedStore, DataDir: dataDir,
-		Keys: keys, Seats: seatStore, Billing: billing.StripeFromEnv(),
+		Keys: keys, GitOps: gitStore, Secrets: secretStore, Updates: updateSvc, Kube: kubeSet,
 	})
 
 	port := os.Getenv("PORT")

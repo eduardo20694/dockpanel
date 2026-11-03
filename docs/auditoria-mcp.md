@@ -38,4 +38,6 @@ Ambiente: dockerd 29.1.3, socket local, containers `dp-sleep` (busybox em execu�
 | kubernetes_proxy | sim | sem API configurada responde isso, sem inventar cluster | — |
 | resolve_problem | sim | — | — |
 
+Tools de GitOps, cofre, atualização de imagem, acesso temporário, relatório e templates são cobertas por testes de unidade e pelo cliente MCP in-process (`TestPlatformToolsSDK`). O terminal web grava o comando na auditoria e recusa viewer, auditor e modo somente leitura.
+
 HTTP streamable (`/mcp`) e SSE (`/sse`) exigem `Authorization: Bearer`. Coberto por `TestMCPHTTPKeyAuth`: chave válida, inválida, revogada e viewer sem permissão de escrita.

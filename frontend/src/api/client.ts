@@ -60,8 +60,28 @@ export const api = {
     },
     host: (hours = 24) => request<{ t: string; cpu: number; mem: number }[]>(`/metrics/host?hours=${hours}`),
   },
+  swarm: {
+    nodes: () => request<{ nodes: { id: string; hostname: string; role: string; state: string; leader: boolean }[] }>('/swarm/nodes'),
+    services: () => request<{ services: { id: string; name: string; image: string; stack?: string; mode: string; replicas: number; running: number }[] }>('/swarm/services'),
+    tasks: (name: string) => request<{ tasks: { id: string; state: string; slot: number }[] }>(`/swarm/services/${encodeURIComponent(name)}/tasks`),
+    logs: (name: string) => request<{ logs: string }>(`/swarm/services/${encodeURIComponent(name)}/logs`),
+    scale: (name: string, replicas: number) => request(`/swarm/services/${encodeURIComponent(name)}/scale`, { method: 'POST', body: JSON.stringify({ replicas }) }),
+    rollback: (name: string) => request(`/swarm/services/${encodeURIComponent(name)}/rollback`, { method: 'POST', body: '{}' }),
+    secrets: () => request<{ secrets: { id: string; name: string }[] }>('/swarm/secrets'),
+    configs: () => request<{ configs: { id: string; name: string }[] }>('/swarm/configs'),
+    stacks: () => request<{ stacks: { name: string; services: string[] }[] }>('/swarm/stacks'),
+  },
+  k8s: {
+    namespaces: () => request<{ namespaces: { name: string; status: string }[] }>('/k8s/namespaces'),
+    workloads: (namespace?: string) => request<{ workloads: { kind: string; namespace: string; name: string; replicas: number; ready: number; image?: string }[] }>(`/k8s/workloads${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`),
+    pods: (namespace?: string) => request<{ pods: { namespace: string; name: string; phase: string; restarts: number; ready: string }[] }>(`/k8s/pods${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`),
+    services: (namespace?: string) => request<{ services: { namespace: string; name: string; type: string; ports: string[] }[] }>(`/k8s/services${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`),
+    broke: (namespace?: string) => request<{ problems: { namespace: string; pod: string; reason: string; severity: string }[] }>(`/k8s/broke${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`),
+    scale: (body: { kind: string; namespace: string; name: string; replicas: number }) => request('/k8s/scale', { method: 'POST', body: JSON.stringify(body) }),
+    rollout: (body: { kind: string; namespace: string; name: string }) => request('/k8s/rollout', { method: 'POST', body: JSON.stringify(body) }),
+  },
   hosts: {
-    list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string }[] }>('/hosts'),
+    list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string; kind?: string }[] }>('/hosts'),
   },
   executive: {
     summary: () => request<any>('/executive'),
@@ -196,22 +216,95 @@ export const api = {
   cost: {
     summary: () => request<{ usdPerDay: number; note: string; items: { name: string; usdPerDay: number; cpuCores: number; memGB: number }[] }>('/insights/cost'),
   },
-  billing: {
-    status: () => request<{
-      subscription: { plan: string; seats: number; status: string }
-      used: number
-      provider: string
-      plans: { id: string; name: string; seats: number | string; blurb: string }[]
-    }>('/billing'),
-    checkout: (plan: string, seats: number) =>
-      request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan, seats }) }),
-  },
   apiKeys: {
     list: () => request<{ keys: { id: string; name: string; prefix: string; role: string; userId: string; revokedAt?: string; lastUsedAt?: string; expiresAt?: string }[] }>('/api-keys'),
     create: (body: { name: string; role?: string; userId?: string; ttlDays?: number }) =>
       request<{ token: string; key: { id: string; prefix: string } }>('/api-keys', { method: 'POST', body: JSON.stringify(body) }),
     revoke: (id: string) => request<{ ok: boolean }>(`/api-keys/${id}`, { method: 'DELETE' }),
   },
+  gitops: {
+    status: () => request<GitopsStatus>('/gitops'),
+    saveGlobal: (body: { enabled?: boolean; pollSeconds?: number; webhookSecret?: string }) =>
+      request<GitopsStatus>('/gitops', { method: 'PUT', body: JSON.stringify(body) }),
+    saveStack: (stack: string, body: Record<string, unknown>) =>
+      request<GitopsStatus>(`/gitops/stacks/${encodeURIComponent(stack)}`, { method: 'PUT', body: JSON.stringify(body) }),
+    sync: (stack: string) => request(`/gitops/stacks/${encodeURIComponent(stack)}/sync`, { method: 'POST', body: '{}' }),
+    approve: (stack: string) => request(`/gitops/stacks/${encodeURIComponent(stack)}/approve`, { method: 'POST', body: '{}' }),
+  },
+  secrets: {
+    list: (stack?: string) => request<{ secrets: SecretMeta[] }>(`/secrets${stack ? `?stack=${encodeURIComponent(stack)}` : ''}`),
+    put: (body: { stack: string; name: string; kind: string; target: string; value: string }) =>
+      request<{ secret: SecretMeta }>('/secrets', { method: 'PUT', body: JSON.stringify(body) }),
+    remove: (id: string) => request(`/secrets/${id}`, { method: 'DELETE' }),
+    scan: (compose: string) => request<{ findings: { line: number; key: string; suggestion: string }[] }>('/secrets/scan', { method: 'POST', body: JSON.stringify({ compose }) }),
+  },
+  updates: {
+    status: () => request<{ items: ImageItem[]; history: { container: string; status: string; detail?: string }[]; policy: { mode: string; intervalSeconds: number } }>('/updates'),
+    policy: (body: { mode: string; intervalSeconds: number; notify: boolean }) =>
+      request('/updates/policy', { method: 'PUT', body: JSON.stringify(body) }),
+    check: () => request<{ items: ImageItem[] }>('/updates/check', { method: 'POST', body: '{}' }),
+    apply: (container: string) => request<{ result: { status: string; detail?: string } }>('/updates/apply', { method: 'POST', body: JSON.stringify({ container }) }),
+  },
+  sessions: {
+    list: () => request<{ sessions: GuestSession[] }>('/sessions'),
+    create: (body: { name: string; role: string; hours: number; stacks: string[]; hosts: string[] }) =>
+      request<{ token: string; session: GuestSession }>('/sessions', { method: 'POST', body: JSON.stringify(body) }),
+    revoke: (id: string) => request(`/sessions/${id}`, { method: 'DELETE' }),
+    timeline: (id: string) => request<{ events: { at: string; actor?: string; action: string; detail?: string }[] }>(`/sessions/${id}/timeline`),
+  },
+  templates: {
+    list: () => request<{ templates: StackTemplate[] }>('/templates'),
+    deploy: (id: string, body: { stack: string; vars: Record<string, string> }) =>
+      request<{ dir: string; result?: { ok?: boolean } }>(`/templates/${id}/deploy`, { method: 'POST', body: JSON.stringify(body) }),
+  },
+  reports: {
+    create: (body: { title: string; incident: string; finalState: string; session?: string }) =>
+      request<{ id: string; markdown: string }>('/reports', { method: 'POST', body: JSON.stringify(body) }),
+    pdfUrl: (id: string) => `/api/reports/${id}/pdf`,
+  },
+}
+
+export interface GitopsStatus {
+  enabled: boolean
+  pollSeconds: number
+  webhookConfigured: boolean
+  stacks: { stack: string; repoUrl: string; branch: string; mode: string; enabled: boolean; pending: boolean; pendingDiff?: string; credentialSet: boolean }[]
+  history: { at: string; stack: string; status: string; trigger: string; detail?: string }[]
+}
+
+export interface SecretMeta {
+  id: string
+  stack: string
+  name: string
+  kind: string
+  target: string
+}
+
+export interface ImageItem {
+  container: string
+  image: string
+  current?: string
+  latest?: string
+  newerTag?: string
+  outdated: boolean
+  error?: string
+}
+
+export interface GuestSession {
+  id: string
+  name: string
+  role: string
+  stacks?: string[]
+  hosts?: string[]
+  expiresAt?: string
+  revokedAt?: string
+}
+
+export interface StackTemplate {
+  id: string
+  name: string
+  summary: string
+  vars: { key: string; label: string; default?: string; secret?: boolean }[]
 }
 
 export interface AuthUser {

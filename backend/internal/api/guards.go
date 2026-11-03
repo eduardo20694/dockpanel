@@ -66,6 +66,9 @@ func (s *Server) auditMiddleware(next http.Handler) http.Handler {
 		if u := userFromContext(r); u != nil {
 			ev.Actor = u.Email
 			ev.OrgID = u.OrgID
+			if u.KeyID != "" {
+				ev.Detail = "key:" + u.KeyID
+			}
 		}
 		_ = s.Audit.Append(ev)
 	})

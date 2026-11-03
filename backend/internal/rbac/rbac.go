@@ -18,7 +18,7 @@ func Allow(role, method, path string) bool {
 		return true
 	}
 	method = strings.ToUpper(method)
-	read := method == "GET" || method == "HEAD" || method == "OPTIONS"
+	read := method == "GET" || method == "HEAD" || method == "OPTIONS" || (method == "POST" && path == "/api/secrets/scan")
 	switch role {
 	case RoleAdmin:
 		return true
@@ -36,7 +36,10 @@ func Allow(role, method, path string) bool {
 		if !read {
 			return false
 		}
-		return !strings.HasPrefix(path, "/api/audit")
+		if strings.HasPrefix(path, "/api/audit") || strings.HasPrefix(path, "/api/secrets") || strings.HasPrefix(path, "/api/sessions") || strings.HasPrefix(path, "/api/reports") {
+			return false
+		}
+		return true
 	default:
 		return read && !strings.HasPrefix(path, "/api/audit")
 	}
