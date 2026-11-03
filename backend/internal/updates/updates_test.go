@@ -57,6 +57,18 @@ func TestRegistryAndRollback(t *testing.T) {
 	if eng.pulled != 0 {
 		t.Fatal("approval pulled")
 	}
+	svc.BlockCritical = true
+	svc.Critical = func(image string) (int, error) {
+		if image == "1.26.0" {
+			return 4, nil
+		}
+		return 1, nil
+	}
+	blocked, err := svc.Apply(context.Background(), "api", "ana", nil)
+	if err == nil || blocked.Status != "blocked" || eng.pulled != 0 {
+		t.Fatalf("cve %+v %v pulled=%d", blocked, err, eng.pulled)
+	}
+	svc.BlockCritical = false
 	res, err := svc.Apply(context.Background(), "api", "ana", nil)
 	if err == nil || res.Status != "rolled_back" || eng.rolled != 1 || eng.pulled != 1 {
 		t.Fatalf("%+v %v pulled=%d rolled=%d", res, err, eng.pulled, eng.rolled)

@@ -257,6 +257,30 @@ export const api = {
     deploy: (id: string, body: { stack: string; vars: Record<string, string> }) =>
       request<{ dir: string; result?: { ok?: boolean } }>(`/templates/${id}/deploy`, { method: 'POST', body: JSON.stringify(body) }),
   },
+  identity: {
+    status: () => request<{ providers: { id: string; name: string }[]; ldap: boolean; mfa: string[] }>('/auth/identity'),
+  },
+  agents: {
+    list: () => request<{ agents: { id: string; name: string; online: boolean; revoked: boolean }[] }>('/agents'),
+    enroll: (name: string) => request<{ token: string; agent: { id: string; name: string } }>('/agents', { method: 'POST', body: JSON.stringify({ name }) }),
+    revoke: (id: string) => request('/agents/revoke', { method: 'POST', body: JSON.stringify({ id }) }),
+  },
+  observe: {
+    status: () => request<{ metricsPath: string; otel: boolean; grafana: string; sample: string }>('/observability'),
+  },
+  notify: {
+    rules: () => request<{ rules: { event: string; minSeverity: string; channels: string[] }[]; channels: string[] }>('/notify/rules'),
+    save: (rules: { event: string; minSeverity: string; channels: string[] }[]) =>
+      request('/notify/rules', { method: 'PUT', body: JSON.stringify({ rules }) }),
+    preview: (event: string, severity: string) => request<{ channels: string[]; limited: boolean }>('/notify/preview', { method: 'POST', body: JSON.stringify({ event, severity }) }),
+  },
+  compose: {
+    preview: (yaml: string) => request<{ services: { name: string; image: string; ports: string[]; env: string[] }[]; yaml: string }>('/compose/preview', { method: 'POST', body: JSON.stringify({ yaml }) }),
+    render: (services: { name: string; image: string; ports: string[]; env?: string[] }[]) => request<{ yaml: string }>('/compose/render', { method: 'POST', body: JSON.stringify({ services }) }),
+  },
+  files: {
+    list: (path: string) => request<{ entries: { name: string; path: string; dir: boolean; size: number }[] }>(`/files?path=${encodeURIComponent(path)}`),
+  },
   reports: {
     create: (body: { title: string; incident: string; finalState: string; session?: string }) =>
       request<{ id: string; markdown: string }>('/reports', { method: 'POST', body: JSON.stringify(body) }),

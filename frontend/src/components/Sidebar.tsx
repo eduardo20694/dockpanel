@@ -40,6 +40,12 @@ const groups = [
       { to: '/acesso', label: 'Acesso', icon: ShieldIcon },
       { to: '/templates', label: 'Templates', icon: RocketIcon },
       { to: '/relatorio', label: 'Relatório', icon: LogIcon },
+      { to: '/identidade', label: 'Identidade', icon: ShieldIcon },
+      { to: '/agentes', label: 'Agentes', icon: BoxIcon },
+      { to: '/observabilidade', label: 'Observabilidade', icon: ChartIcon },
+      { to: '/notificacoes', label: 'Notificações', icon: BellIcon },
+      { to: '/editor', label: 'Editor', icon: LogIcon },
+      { to: '/arquivos', label: 'Arquivos', icon: DiskIcon },
     ],
   },
 ]

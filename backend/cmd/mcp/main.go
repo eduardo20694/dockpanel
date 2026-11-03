@@ -121,6 +121,7 @@ func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolved
 	registerCoverageTools(s, pool)
 	registerPlatformTools(s, pool, aud, svc)
 	registerOrchestratorTools(s, pool, svc.Kube)
+	registerGapTools(s)
 	return s
 }
 

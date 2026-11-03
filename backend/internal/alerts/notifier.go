@@ -23,6 +23,11 @@ type Notifier struct {
 	whatsappURL    string
 	whatsappToken  string
 	whatsappTo     string
+	slackWebhook   string
+	teamsWebhook   string
+	pagerdutyKey   string
+	pagerdutyURL   string
+	genericWebhook string
 	http           *http.Client
 }
 
@@ -39,6 +44,10 @@ func NewFromEnv() *Notifier {
 		whatsappURL:    os.Getenv("ALERT_WHATSAPP_API_URL"),
 		whatsappToken:  os.Getenv("ALERT_WHATSAPP_TOKEN"),
 		whatsappTo:     os.Getenv("ALERT_WHATSAPP_TO"),
+		slackWebhook:   os.Getenv("ALERT_SLACK_WEBHOOK"),
+		teamsWebhook:   os.Getenv("ALERT_TEAMS_WEBHOOK"),
+		pagerdutyKey:   os.Getenv("ALERT_PAGERDUTY_KEY"),
+		genericWebhook: os.Getenv("ALERT_WEBHOOK_URL"),
 		http:           &http.Client{Timeout: 15 * time.Second},
 	}
 }
@@ -94,6 +103,33 @@ func (n *Notifier) SendSeverity(severity, title, body string, channels []string)
 	if want("whatsapp") && n.whatsappURL != "" && n.whatsappToken != "" {
 		if err := n.sendWhatsApp(title, body); err != nil {
 			errs = append(errs, "whatsapp: "+err.Error())
+		}
+	}
+	if want("slack") && n.slackWebhook != "" {
+		if err := n.postJSON(n.slackWebhook, map[string]string{"text": msg}); err != nil {
+			errs = append(errs, "slack: "+err.Error())
+		}
+	}
+	if want("teams") && n.teamsWebhook != "" {
+		if err := n.postJSON(n.teamsWebhook, map[string]string{"text": msg}); err != nil {
+			errs = append(errs, "teams: "+err.Error())
+		}
+	}
+	if want("pagerduty") && n.pagerdutyKey != "" {
+		pd := n.pagerdutyURL
+		if pd == "" {
+			pd = "https://events.pagerduty.com/v2/enqueue"
+		}
+		if err := n.postJSON(pd, map[string]any{
+			"routing_key": n.pagerdutyKey, "event_action": "trigger",
+			"payload": map[string]string{"summary": title, "severity": severity, "source": "dockpilot"},
+		}); err != nil {
+			errs = append(errs, "pagerduty: "+err.Error())
+		}
+	}
+	if want("webhook") && n.genericWebhook != "" {
+		if err := n.postJSON(n.genericWebhook, map[string]string{"title": title, "body": body, "severity": severity}); err != nil {
+			errs = append(errs, "webhook: "+err.Error())
 		}
 	}
 	if len(errs) > 0 {
@@ -245,6 +281,22 @@ func (n *Notifier) sendWhatsApp(title, body string) error {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("whatsapp HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (n *Notifier) postJSON(url string, payload any) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	resp, err := n.http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	return nil
 }

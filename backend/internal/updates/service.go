@@ -11,6 +11,7 @@ import (
 
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/envx"
+	"dockerpilot/internal/scan"
 )
 
 type Item struct {
@@ -51,14 +52,16 @@ type Engine interface {
 }
 
 type Service struct {
-	mu       sync.Mutex
-	path     string
-	policy   Policy
-	items    []Item
-	history  []Result
-	Registry Registry
-	Engine   Engine
-	Notify   func(title, body string)
+	mu            sync.Mutex
+	path          string
+	policy        Policy
+	items         []Item
+	history       []Result
+	Registry      Registry
+	Engine        Engine
+	Notify        func(title, body string)
+	BlockCritical bool
+	Critical      func(image string) (int, error)
 }
 
 func Open(dir string) (*Service, error) {
@@ -190,6 +193,19 @@ func (s *Service) Apply(ctx context.Context, container, actor string, aud *audit
 	s.mu.Unlock()
 	if !found || !item.Outdated {
 		return Result{Container: container, Status: "current", Detail: "já atualizado"}, nil
+	}
+	if s.BlockCritical && s.Critical != nil {
+		targetHint := item.Image
+		if item.NewerTag != "" {
+			targetHint = item.NewerTag
+		}
+		cur, _ := s.Critical(item.Image)
+		nxt, err := s.Critical(targetHint)
+		if err == nil && scan.BlockCriticalIncrease(cur, nxt, true) {
+			res := Result{Container: container, Status: "blocked", Detail: "a imagem nova tem mais CVEs críticas", Image: item.Image}
+			s.push(res, actor, aud)
+			return res, errors.New(res.Detail)
+		}
 	}
 	target := item.Image
 	if item.NewerTag != "" {

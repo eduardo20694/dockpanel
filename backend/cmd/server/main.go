@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"dockerpilot/internal/agent"
 	"dockerpilot/internal/alerts"
 	"dockerpilot/internal/api"
 	"dockerpilot/internal/apikey"
@@ -164,10 +165,21 @@ func main() {
 	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
 	kubeSet := kube.Open(kubeSources)
 
+	mfaStore, err := auth.OpenMFA(dataDir)
+	if err != nil {
+		log.Printf("aviso: MFA desabilitado: %v", err)
+	}
+	var agentHub *agent.Hub
+	if ca, err := agent.NewCA(); err != nil {
+		log.Printf("aviso: agente remoto desabilitado: %v", err)
+	} else {
+		agentHub = agent.NewHub(ca)
+	}
+
 	server := api.NewServerFromDeps(api.Deps{
 		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
 		Audit: auditLog, Orgs: orgs, Resolved: resolvedStore, DataDir: dataDir,
-		Keys: keys, GitOps: gitStore, Secrets: secretStore, Updates: updateSvc, Kube: kubeSet,
+		Keys: keys, GitOps: gitStore, Secrets: secretStore, Updates: updateSvc, Kube: kubeSet, Agents: agentHub, MFA: mfaStore,
 	})
 
 	port := os.Getenv("PORT")

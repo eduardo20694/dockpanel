@@ -76,9 +76,16 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		TOTP     string `json:"totp"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "corpo inválido", http.StatusBadRequest)
+		return
+	}
+	if s.MFA != nil && s.MFA.HasTOTP(body.Email) && !s.MFA.CheckTOTP(body.Email, body.TOTP, time.Now()) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "código TOTP obrigatório", "mfa": true})
 		return
 	}
 	res, err := s.Auth.Login(body.Email, body.Password)

@@ -85,7 +85,8 @@ func isPublicRoute(path string) bool {
 		"/api/auth/login", "/api/auth/config", "/api/auth/sso", "/api/auth/sso/exchange",
 		"/api/auth/me", "/api/auth/logout",
 		"/api/gitops/webhook",
-		"/api/client-errors":
+		"/api/client-errors",
+		"/metrics":
 		return true
 	default:
 		return false

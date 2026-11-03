@@ -34,6 +34,12 @@ import Templates from './pages/Templates'
 import Report from './pages/Report'
 import Swarm from './pages/Swarm'
 import Kubernetes from './pages/Kubernetes'
+import Identity from './pages/Identity'
+import Agents from './pages/Agents'
+import Observe from './pages/Observe'
+import Notify from './pages/Notify'
+import Editor from './pages/Editor'
+import Files from './pages/Files'
 import { CommandPaletteProvider } from './components/CommandPalette'
 
 const queryClient = new QueryClient({
@@ -97,6 +103,12 @@ function AppRoutes() {
         <Route path="/acesso" element={<Access />} />
         <Route path="/templates" element={<Templates />} />
         <Route path="/relatorio" element={<Report />} />
+        <Route path="/identidade" element={<Identity />} />
+        <Route path="/agentes" element={<Agents />} />
+        <Route path="/observabilidade" element={<Observe />} />
+        <Route path="/notificacoes" element={<Notify />} />
+        <Route path="/editor" element={<Editor />} />
+        <Route path="/arquivos" element={<Files />} />
         <Route path="/stacks" element={<Stacks />} />
         <Route path="/swarm" element={<Swarm />} />
         <Route path="/kubernetes" element={<Kubernetes />} />

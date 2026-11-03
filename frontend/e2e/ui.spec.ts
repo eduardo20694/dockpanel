@@ -154,6 +154,17 @@ async function mockApi(page: Page, opts?: { anonymous?: boolean }) {
         { id: 'grafana-prometheus', name: 'Grafana + Prometheus', summary: 'Métricas.', vars: [] },
       ] })
     }
+    if (p.endsWith('/auth/identity')) return json({ providers: [{ id: 'google', name: 'Google' }, { id: 'entra', name: 'Microsoft Entra' }, { id: 'keycloak', name: 'Keycloak' }, { id: 'ldap', name: 'LDAP / Active Directory' }], ldap: false, mfa: ['totp', 'passkey'] })
+    if (p.endsWith('/observability')) return json({ metricsPath: '/metrics', otel: false, grafana: 'docs/grafana/dockpilot.json', sample: '# TYPE dockpilot_hosts gauge\ndockpilot_hosts 3\n' })
+    if (p === '/api/agents' && method === 'POST') return json({ token: 'enroll_once', agent: { id: 'ag_1', name: 'filial-sp' } })
+    if (p.endsWith('/agents/revoke')) return json({ ok: true })
+    if (p === '/api/agents') return json({ agents: [{ id: 'ag_1', name: 'filial-sp', online: true, revoked: false }] })
+    if (p.endsWith('/notify/rules') && method === 'PUT') return json({ rules: [{ event: 'deploy', minSeverity: 'critical', channels: ['slack', 'pagerduty'] }] })
+    if (p.endsWith('/notify/preview')) return json({ channels: ['slack', 'pagerduty'], limited: true })
+    if (p.endsWith('/notify/rules')) return json({ rules: [], channels: ['slack', 'teams', 'telegram', 'discord', 'email', 'webhook', 'pagerduty'] })
+    if (p.endsWith('/compose/preview')) return json({ services: [{ name: 'api', image: 'ghcr.io/acme/api:1.4.0', ports: ['8080:80'], env: [] }], yaml: 'services:\n  api:\n    image: ghcr.io/acme/api:1.4.0\n' })
+    if (p.endsWith('/compose/render')) return json({ yaml: 'services:\n  api:\n    image: ghcr.io/acme/api:1.5.0\n' })
+    if (p.endsWith('/files')) return json({ entries: [{ name: 'config.yml', path: '/app/config.yml', dir: false, size: 12 }, { name: 'data', path: '/app/data', dir: true, size: 4096 }] })
     if (p === '/api/reports' && method === 'POST') {
       return json({ id: 'r1', markdown: '# Relatório de atendimento\n\n**Dockpilot**\n\ncrash loop' })
     }
@@ -198,6 +209,12 @@ const tour: [string, string, string][] = [
   ['/acesso', 'Acesso temporário', 'access'],
   ['/templates', 'Templates', 'templates'],
   ['/relatorio', 'Relatório', 'report'],
+  ['/identidade', 'Identidade', 'identity'],
+  ['/agentes', 'Agentes', 'agents'],
+  ['/observabilidade', 'Observabilidade', 'observe'],
+  ['/notificacoes', 'Notificações', 'notify'],
+  ['/editor', 'Editor', 'editor'],
+  ['/arquivos', 'Arquivos', 'files'],
 ]
 
 test('login e entrada', async ({ page }) => {
@@ -234,7 +251,7 @@ test('tema segue o sistema, persiste e troca pela paleta', async ({ page }) => {
 })
 
 test('telas principais nos dois temas', async ({ page }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(240_000)
   await mockApi(page)
   await useTheme(page, 'dark')
   for (const [href, heading, file] of tour) {

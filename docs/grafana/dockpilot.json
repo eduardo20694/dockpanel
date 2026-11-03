@@ -1,0 +1,12 @@
+{
+  "title": "Dockpilot",
+  "uid": "dockpilot",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "panels": [
+    {"type": "stat", "title": "Ambientes", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}, "targets": [{"expr": "dockpilot_hosts"}]},
+    {"type": "stat", "title": "Containers", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}, "targets": [{"expr": "dockpilot_containers"}]},
+    {"type": "stat", "title": "Alertas", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}, "targets": [{"expr": "dockpilot_alerts"}]},
+    {"type": "stat", "title": "Deploys", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}, "targets": [{"expr": "dockpilot_deploys"}]}
+  ]
+}

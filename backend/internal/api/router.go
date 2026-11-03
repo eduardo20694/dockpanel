@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"dockerpilot/internal/agent"
 	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
@@ -14,6 +15,7 @@ import (
 	"dockerpilot/internal/gitops"
 	"dockerpilot/internal/kube"
 	"dockerpilot/internal/logcenter"
+	"dockerpilot/internal/notify"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/resolved"
 	"dockerpilot/internal/secrets"
@@ -38,6 +40,9 @@ type Server struct {
 	Secrets  *secrets.Store
 	Updates  *updates.Service
 	Kube     *kube.Set
+	Agents   *agent.Hub
+	MFA      *auth.MFAStore
+	rules    []notify.Rule
 	DataDir  string
 	Router   *chi.Mux
 }
@@ -55,6 +60,8 @@ type Deps struct {
 	Secrets  *secrets.Store
 	Updates  *updates.Service
 	Kube     *kube.Set
+	Agents   *agent.Hub
+	MFA      *auth.MFAStore
 	DataDir  string
 }
 
@@ -65,7 +72,7 @@ func NewServerFromDeps(d Deps) *Server {
 	s := &Server{
 		Hosts: d.Hosts, Store: d.Store, LogStore: d.LogStore, Auth: d.Auth,
 		Audit: d.Audit, Orgs: d.Orgs, Resolved: d.Resolved, DataDir: d.DataDir,
-		Keys: d.Keys, GitOps: d.GitOps, Secrets: d.Secrets, Updates: d.Updates, Kube: d.Kube,
+		Keys: d.Keys, GitOps: d.GitOps, Secrets: d.Secrets, Updates: d.Updates, Kube: d.Kube, Agents: d.Agents, MFA: d.MFA,
 		Router: chi.NewRouter(),
 	}
 	s.routes()
@@ -99,6 +106,7 @@ func (s *Server) routes() {
 	r.Use(s.rbacMiddleware)
 	r.Use(s.auditMiddleware)
 
+	r.Get("/metrics", s.prometheusMetrics)
 	r.Get("/api/health", s.health)
 	r.Get("/api/health/detailed", s.healthDetailed)
 	r.Get("/api/openapi.json", s.openAPISpec)
@@ -110,6 +118,19 @@ func (s *Server) routes() {
 	r.Post("/api/auth/login", s.authLogin)
 	r.Post("/api/auth/logout", s.authLogout)
 	r.Get("/api/auth/me", s.authMe)
+	r.Get("/api/auth/identity", s.identityStatus)
+	r.Get("/api/observability", s.observabilityStatus)
+	r.Get("/api/agents", s.listAgents)
+	r.Post("/api/agents", s.enrollAgent)
+	r.Post("/api/agents/revoke", s.revokeAgent)
+	r.Post("/api/security/sarif", s.sarifExport)
+	r.Post("/api/security/cve-policy", s.cvePolicy)
+	r.Post("/api/compose/preview", s.composePreview)
+	r.Post("/api/compose/render", s.composeRender)
+	r.Get("/api/files", s.browseFiles)
+	r.Get("/api/notify/rules", s.notifyRules)
+	r.Put("/api/notify/rules", s.notifyRules)
+	r.Post("/api/notify/preview", s.notifyPreview)
 
 	r.Get("/api/hosts", s.listHosts)
 	r.Get("/api/swarm/nodes", s.swarmNodes)

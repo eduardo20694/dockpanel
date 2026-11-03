@@ -10,7 +10,8 @@ COPY backend/go.mod backend/go.sum ./
 RUN for i in 1 2 3 4 5; do go mod download && break || sleep $((i * 3)); done
 COPY backend/ .
 RUN CGO_ENABLED=0 go build -o /dockerpilot ./cmd/server \
- && CGO_ENABLED=0 go build -o /dockerpilot-mcp ./cmd/mcp
+ && CGO_ENABLED=0 go build -o /dockerpilot-mcp ./cmd/mcp \
+ && CGO_ENABLED=0 go build -o /dockerpilot-agent ./cmd/agent
 
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
@@ -35,6 +36,7 @@ RUN apk add --no-cache ca-certificates curl docker-cli tzdata \
  && echo $TZ > /etc/timezone
 COPY --from=backend-build /dockerpilot /usr/local/bin/dockerpilot
 COPY --from=backend-build /dockerpilot-mcp /usr/local/bin/dockerpilot-mcp
+COPY --from=backend-build /dockerpilot-agent /usr/local/bin/dockerpilot-agent
 RUN ln -sf /usr/local/bin/dockerpilot /usr/local/bin/dockpanel
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

@@ -50,6 +50,14 @@ func TestPlatformToolsSDK(t *testing.T) {
 	if err != nil || strings.Contains(out, "hidden-value") {
 		t.Fatalf("%v %s", err, out)
 	}
+	out, _, err = callTool(t, c, "compose_preview", map[string]any{"yaml": "services:\n  api:\n    image: api:1\n"})
+	if err != nil || !strings.Contains(out, "image: api:1") {
+		t.Fatalf("compose %v %s", err, out)
+	}
+	out, _, err = callTool(t, c, "export_sarif", map[string]any{"id": "CVE-2024-9", "severity": "CRITICAL", "image": "api:1"})
+	if err != nil || !strings.Contains(out, "2.1.0") || !strings.Contains(out, "CVE-2024-9") {
+		t.Fatalf("sarif %v %s", err, out)
+	}
 	out, _, err = callTool(t, c, "render_report", map[string]any{"title": "Incidente", "incident": "crash loop", "final_state": "saudável"})
 	if err != nil || !strings.Contains(out, "Dockpilot") || !strings.Contains(out, "crash loop") {
 		t.Fatalf("%v %s", err, out)
