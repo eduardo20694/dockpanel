@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,10 +10,13 @@ import (
 	"dockerpilot/internal/auth"
 	"dockerpilot/internal/composeedit"
 	"dockerpilot/internal/files"
+
 	"dockerpilot/internal/metricsx"
 	"dockerpilot/internal/notify"
 	"dockerpilot/internal/observability"
 	"dockerpilot/internal/scan"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
 func (s *Server) prometheusMetrics(w http.ResponseWriter, r *http.Request) {
@@ -166,16 +170,43 @@ func names(svcs []composeedit.Service) []string {
 }
 
 func (s *Server) browseFiles(w http.ResponseWriter, r *http.Request) {
-	raw := r.URL.Query().Get("listing")
-	if raw == "" {
-		raw = "total 1\n-rw-r--r-- 1 0 0 4 Jan 1 00:00 readme.txt\n"
-	}
 	dir := r.URL.Query().Get("path")
 	if dir == "" {
 		dir = "/"
 	}
-	s.auditAccess(r, "files read", r.URL.Query().Get("container")+" "+dir)
+	containerName := r.URL.Query().Get("container")
+	s.auditAccess(r, "files read", containerName+" "+dir)
+	if containerName == "" {
+		writeJSON(w, map[string]any{"entries": []files.Entry{}})
+		return
+	}
+	dc, err := s.dockerClient(r)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	raw, err := listContainerDir(r.Context(), dc.CLI, containerName, dir)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
 	writeJSON(w, map[string]any{"entries": files.ParseLS(dir, raw)})
+}
+
+func listContainerDir(ctx context.Context, cli *client.Client, containerName, dir string) (string, error) {
+	exec, err := cli.ContainerExecCreate(ctx, containerName, types.ExecConfig{
+		Cmd: []string{"ls", "-ln", dir}, AttachStdout: true, AttachStderr: true,
+	})
+	if err != nil {
+		return "", err
+	}
+	attach, err := cli.ContainerExecAttach(ctx, exec.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", err
+	}
+	defer attach.Close()
+	raw, err := io.ReadAll(io.LimitReader(attach.Reader, 1<<20))
+	return string(raw), err
 }
 
 func (s *Server) notifyRules(w http.ResponseWriter, r *http.Request) {
