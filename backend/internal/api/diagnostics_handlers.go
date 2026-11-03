@@ -3,8 +3,9 @@ package api
 import (
 	"net/http"
 
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/drift"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/drift"
+	"dockerpilot/internal/resolved"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -33,7 +34,32 @@ func (s *Server) scanProblems(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, problems)
+	writeJSON(w, s.withoutResolved(r, problems))
+}
+
+func (s *Server) withoutResolved(r *http.Request, problems []diagnostics.Problem) []diagnostics.Problem {
+	if problems == nil {
+		problems = []diagnostics.Problem{}
+	}
+	if s.Resolved == nil || len(problems) == 0 {
+		return problems
+	}
+	host := s.resolveHostID(r)
+	briefs := make([]resolved.Problem, 0, len(problems))
+	for _, p := range problems {
+		briefs = append(briefs, resolved.Problem{ContainerID: p.ContainerID, Name: p.Name, Reason: p.Reason})
+	}
+	kept := map[string]struct{}{}
+	for _, p := range s.Resolved.Filter(host, briefs) {
+		kept[p.ContainerID+"|"+p.Reason] = struct{}{}
+	}
+	out := make([]diagnostics.Problem, 0, len(kept))
+	for _, p := range problems {
+		if _, ok := kept[p.ContainerID+"|"+p.Reason]; ok {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func (s *Server) diagnoseContainer(w http.ResponseWriter, r *http.Request) {

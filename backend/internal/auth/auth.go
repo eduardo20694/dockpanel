@@ -6,16 +6,18 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
+
+	"dockerpilot/internal/envx"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
-	cookieName    = "dockpanel_token"
-	defaultExpiry = 24 * time.Hour
+	cookieName       = "dockerpilot_token"
+	legacyCookieName = "dockpanel_token"
+	defaultExpiry    = 24 * time.Hour
 )
 
 var (
@@ -23,12 +25,17 @@ var (
 	ErrAuthDisabled       = errors.New("autenticação desabilitada")
 )
 
-// User is the configured admin from DOCKPANEL_ADMIN_* env.
+// User is an authenticated principal (env admin, directory user, or SSO).
 type User struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
-	Role  string `json:"role"`
+	ID     string   `json:"id"`
+	Email  string   `json:"email"`
+	Name   string   `json:"name"`
+	Role   string   `json:"role"`
+	OrgID  string   `json:"orgId,omitempty"`
+	KeyID  string   `json:"-"`
+	Stacks []string `json:"-"`
+	Hosts  []string `json:"-"`
+	Guest  bool     `json:"-"`
 }
 
 type Claims struct {
@@ -36,6 +43,7 @@ type Claims struct {
 	Email  string `json:"email"`
 	Name   string `json:"name"`
 	Role   string `json:"role"`
+	OrgID  string `json:"org,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -47,24 +55,25 @@ type Service struct {
 	name     string
 }
 
-// NewService builds env-based single-admin auth.
-// Requires DOCKPANEL_ADMIN_EMAIL + DOCKPANEL_ADMIN_PASSWORD; otherwise Enabled=false.
+// NewService builds env-based break-glass admin auth.
+// Requires DOCKERPILOT_ADMIN_EMAIL + DOCKERPILOT_ADMIN_PASSWORD
+// (DOCKPANEL_* remains accepted). Otherwise Enabled=false.
 func NewService() (*Service, error) {
-	email := strings.TrimSpace(strings.ToLower(os.Getenv("DOCKPANEL_ADMIN_EMAIL")))
-	pass := os.Getenv("DOCKPANEL_ADMIN_PASSWORD")
+	email := strings.TrimSpace(strings.ToLower(envx.Get("ADMIN_EMAIL")))
+	pass := envx.GetRaw("ADMIN_PASSWORD")
 	if email == "" || pass == "" {
 		return &Service{Enabled: false}, nil
 	}
-	secret := os.Getenv("DOCKPANEL_JWT_SECRET")
+	secret := envx.GetRaw("JWT_SECRET")
 	if secret == "" {
 		b := make([]byte, 32)
 		if _, err := rand.Read(b); err != nil {
 			return nil, err
 		}
 		secret = base64.RawURLEncoding.EncodeToString(b)
-		fmt.Println("aviso: DOCKPANEL_JWT_SECRET não definido — usando segredo efêmero (reiniciar invalida sessões)")
+		fmt.Println("aviso: DOCKERPILOT_JWT_SECRET não definido — usando segredo efêmero (reiniciar invalida sessões)")
 	}
-	name := strings.TrimSpace(os.Getenv("DOCKPANEL_ADMIN_NAME"))
+	name := strings.TrimSpace(envx.Get("ADMIN_NAME"))
 	if name == "" {
 		name = "Administrador"
 	}
@@ -78,7 +87,22 @@ func NewService() (*Service, error) {
 }
 
 func (s *Service) AdminUser() User {
-	return User{ID: "admin", Email: s.email, Name: s.name, Role: "admin"}
+	return User{ID: "admin", Email: s.email, Name: s.name, Role: "admin", OrgID: "default"}
+}
+
+// Issue signs a token for a directory or SSO user. The service must be enabled
+// so a stable JWT secret exists.
+func (s *Service) Issue(u User) (string, error) {
+	if !s.Enabled {
+		return "", ErrAuthDisabled
+	}
+	if u.Role == "" {
+		u.Role = "viewer"
+	}
+	if u.OrgID == "" {
+		u.OrgID = "default"
+	}
+	return s.sign(u)
 }
 
 type LoginResult struct {
@@ -110,6 +134,7 @@ func (s *Service) sign(u User) (string, error) {
 		Email:  u.Email,
 		Name:   u.Name,
 		Role:   u.Role,
+		OrgID:  u.OrgID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   u.ID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -141,8 +166,9 @@ func (s *Service) ParseToken(token string) (*Claims, error) {
 }
 
 func (s *Service) UserFromClaims(c *Claims) User {
-	return User{ID: c.UserID, Email: c.Email, Name: c.Name, Role: c.Role}
+	return User{ID: c.UserID, Email: c.Email, Name: c.Name, Role: c.Role, OrgID: c.OrgID}
 }
 
-func CookieName() string     { return cookieName }
-func TokenExpiry() time.Time { return time.Now().Add(defaultExpiry) }
+func CookieName() string       { return cookieName }
+func LegacyCookieName() string { return legacyCookieName }
+func TokenExpiry() time.Time   { return time.Now().Add(defaultExpiry) }

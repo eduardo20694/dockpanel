@@ -54,7 +54,7 @@ export default function Dashboard() {
     <PageShell>
       <PageInner wide>
         {/* Hero */}
-        <div className="hero-banner animate-slide-up">
+        <div className="hero-banner">
           <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -66,8 +66,8 @@ export default function Dashboard() {
               <h1 className="font-display font-bold text-3xl md:text-4xl tracking-tight text-text mb-2">
                 {hostLabel}
               </h1>
-              <p className="text-text-muted text-[15px] max-w-lg">
-                Painel Docker self-hosted: diagnóstico, segurança, stacks e deploy no mesmo host.
+              <p className="text-text-muted text-[15px] max-w-lg leading-relaxed">
+                Dockpilot no mesmo host do Docker: diagnóstico, segurança, stacks e o que fazer quando algo quebra.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 shrink-0">

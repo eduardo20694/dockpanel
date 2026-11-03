@@ -1,6 +1,8 @@
 import { useHost } from '../context/HostContext'
 
-/** Seletor quando há mais de um host em DOCKPANEL_HOSTS. */
+const kindLabel: Record<string, string> = { docker: 'Docker', swarm: 'Swarm', kubernetes: 'Kubernetes', k8s: 'Kubernetes' }
+
+/** Seletor de ambiente e tipo (Docker, Swarm ou Kubernetes). */
 export default function HostSwitcher() {
   const { hosts, hostId, setHostId, loading } = useHost()
   if (loading) return null
@@ -14,19 +16,16 @@ export default function HostSwitcher() {
       </span>
     )
   }
-  if (hosts.length === 1) {
-    return null
-  }
   return (
     <select
-      className="input !py-1 !px-2 !text-xs !w-auto min-w-[120px] max-w-[180px]"
+      className="input !py-1 !px-2 !text-xs !w-auto min-w-[140px] max-w-[220px]"
       value={hostId}
       onChange={(e) => setHostId(e.target.value)}
-      aria-label="Host Docker"
+      aria-label="Ambiente"
     >
       {hosts.map((h) => (
         <option key={h.id} value={h.id}>
-          {h.label}
+          {h.label} · {kindLabel[h.kind || 'docker'] || h.kind}
         </option>
       ))}
     </select>

@@ -9,15 +9,25 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"dockpanel/internal/alerts"
-	"dockpanel/internal/api"
-	"dockpanel/internal/auth"
-	"dockpanel/internal/collector"
-	"dockpanel/internal/dockerclient"
-	"dockpanel/internal/logcenter"
-	"dockpanel/internal/observability"
-	"dockpanel/internal/store"
-	"dockpanel/internal/telegram"
+	"dockerpilot/internal/agent"
+	"dockerpilot/internal/alerts"
+	"dockerpilot/internal/api"
+	"dockerpilot/internal/apikey"
+	"dockerpilot/internal/audit"
+	"dockerpilot/internal/auth"
+	"dockerpilot/internal/collector"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/envx"
+	"dockerpilot/internal/gitops"
+	"dockerpilot/internal/kube"
+	"dockerpilot/internal/logcenter"
+	"dockerpilot/internal/observability"
+	"dockerpilot/internal/org"
+	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/secrets"
+	"dockerpilot/internal/store"
+	"dockerpilot/internal/telegram"
+	"dockerpilot/internal/updates"
 
 	"github.com/joho/godotenv"
 )
@@ -27,7 +37,7 @@ func loadEnv() {
 		filepath.Join("..", ".env"),
 		".env",
 	}
-	if root := os.Getenv("DOCKPANEL_ROOT"); root != "" {
+	if root := envx.Get("ROOT"); root != "" {
 		candidates = append([]string{filepath.Join(root, ".env")}, candidates...)
 	}
 	for _, p := range candidates {
@@ -78,10 +88,61 @@ func main() {
 	if authSvc.Enabled {
 		log.Printf("auth: login ativo (admin env)")
 	} else {
-		log.Printf("auth: desabilitado (defina DOCKPANEL_ADMIN_EMAIL e DOCKPANEL_ADMIN_PASSWORD)")
+		log.Printf("auth: desabilitado (defina DOCKERPILOT_ADMIN_EMAIL e DOCKERPILOT_ADMIN_PASSWORD)")
 	}
 
+	dataDir := envx.DataDir()
+	var auditLog *audit.Log
+	if al, err := audit.Open(dataDir); err != nil {
+		log.Printf("aviso: auditoria desabilitada: %v", err)
+	} else {
+		auditLog = al
+	}
+	var orgs *org.Store
+	if og, err := org.Open(dataDir); err != nil {
+		log.Printf("aviso: organizações desabilitadas: %v", err)
+	} else {
+		orgs = og
+	}
+	var resolvedStore *resolved.Store
+	if rs, err := resolved.Open(dataDir); err != nil {
+		log.Printf("aviso: problemas resolvidos desabilitados: %v", err)
+	} else {
+		resolvedStore = rs
+	}
+	var keys *apikey.Store
+	if ks, err := apikey.Open(dataDir); err != nil {
+		log.Printf("aviso: chaves MCP desabilitadas: %v", err)
+	} else {
+		keys = ks
+	}
+	var gitStore *gitops.Store
+	if gs, err := gitops.Open(dataDir); err != nil {
+		log.Printf("aviso: gitops desabilitado: %v", err)
+	} else {
+		gitStore = gs
+		gitStore.Start(ctx, auditLog)
+	}
+	var secretStore *secrets.Store
+	if ss, err := secrets.Open(dataDir); err != nil {
+		log.Printf("aviso: cofre desabilitado: %v", err)
+	} else {
+		secretStore = ss
+	}
+	var updateSvc *updates.Service
+	if us, err := updates.Open(dataDir); err != nil {
+		log.Printf("aviso: atualizações desabilitadas: %v", err)
+	} else {
+		updateSvc = us
+		if c, err := pool.Get(pool.DefaultID()); err == nil && c != nil {
+			updateSvc.Engine = updates.NewDockerEngine(c.CLI)
+		}
+		updateSvc.Start(ctx, auditLog)
+	}
 	notifier := alerts.NewFromEnv()
+	if updateSvc != nil {
+		updateSvc.Notify = func(title, body string) { _ = notifier.SendSeverity("warning", title, body, nil) }
+	}
 	alerts.NewScanner(pool, notifier, st).Start(ctx)
 	telegram.NewFromEnv(pool, notifier).Start(ctx)
 	collector.New(pool, st).Start(ctx)
@@ -95,8 +156,30 @@ func main() {
 		defer logStore.Close()
 	}
 
+	var kubeSources []kube.Source
+	for _, h := range pool.List() {
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
+		}
+	}
+	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
+	kubeSet := kube.Open(kubeSources)
+
+	mfaStore, err := auth.OpenMFA(dataDir)
+	if err != nil {
+		log.Printf("aviso: MFA desabilitado: %v", err)
+	}
+	var agentHub *agent.Hub
+	if ca, err := agent.NewCA(); err != nil {
+		log.Printf("aviso: agente remoto desabilitado: %v", err)
+	} else {
+		agentHub = agent.NewHub(ca)
+	}
+
 	server := api.NewServerFromDeps(api.Deps{
 		Hosts: pool, Store: st, LogStore: logStore, Auth: authSvc,
+		Audit: auditLog, Orgs: orgs, Resolved: resolvedStore, DataDir: dataDir,
+		Keys: keys, GitOps: gitStore, Secrets: secretStore, Updates: updateSvc, Kube: kubeSet, Agents: agentHub, MFA: mfaStore,
 	})
 
 	port := os.Getenv("PORT")
@@ -104,6 +187,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("dockpanel backend ouvindo em :%s", port)
+	log.Printf("dockpilot backend ouvindo em :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, server.Router))
 }

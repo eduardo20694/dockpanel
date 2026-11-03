@@ -67,7 +67,7 @@ export default function Investigate() {
 
         <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b border-border">
           <div>
-            <h1 className="text-xl font-semibold">{d.name}</h1>
+            <h1 className="text-2xl font-bold text-text">{d.name}</h1>
             <div className="text-sm text-text-muted font-mono mt-1 tabular-nums">
               {report.hostLabel} · {d.state} · exit {d.exitCode} · {d.restartCount} restarts
             </div>

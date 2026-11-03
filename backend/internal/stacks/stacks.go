@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"dockpanel/internal/diagnostics"
+	"dockerpilot/internal/diagnostics"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -14,29 +14,29 @@ import (
 )
 
 type ServiceStatus struct {
-	ContainerID  string                `json:"containerId"`
-	Name         string                `json:"name"`
-	Service      string                `json:"service"`
-	Image        string                `json:"image"`
-	State        string                `json:"state"`
-	Severity     diagnostics.Severity  `json:"severity"`
-	Reason       string                `json:"reason,omitempty"`
-	RestartCount int                   `json:"restartCount"`
-	AffectedBy   string                `json:"affectedBy,omitempty"`
+	ContainerID  string               `json:"containerId"`
+	Name         string               `json:"name"`
+	Service      string               `json:"service"`
+	Image        string               `json:"image"`
+	State        string               `json:"state"`
+	Severity     diagnostics.Severity `json:"severity"`
+	Reason       string               `json:"reason,omitempty"`
+	RestartCount int                  `json:"restartCount"`
+	AffectedBy   string               `json:"affectedBy,omitempty"`
 }
 
 type StackHealth struct {
-	HostID       string          `json:"hostId"`
-	HostLabel    string          `json:"hostLabel"`
-	Project      string          `json:"project"`
-	ComposeFile  string          `json:"composeFile,omitempty"`
-	Total        int             `json:"total"`
-	Running      int             `json:"running"`
-	Critical     int             `json:"critical"`
-	Warning      int             `json:"warning"`
+	HostID       string               `json:"hostId"`
+	HostLabel    string               `json:"hostLabel"`
+	Project      string               `json:"project"`
+	ComposeFile  string               `json:"composeFile,omitempty"`
+	Total        int                  `json:"total"`
+	Running      int                  `json:"running"`
+	Critical     int                  `json:"critical"`
+	Warning      int                  `json:"warning"`
 	Severity     diagnostics.Severity `json:"severity"`
-	Services     []ServiceStatus `json:"services"`
-	CascadeNotes []string        `json:"cascadeNotes"`
+	Services     []ServiceStatus      `json:"services"`
+	CascadeNotes []string             `json:"cascadeNotes"`
 }
 
 func ListStacks(ctx context.Context, cli *client.Client, hostID, hostLabel string) ([]StackHealth, error) {

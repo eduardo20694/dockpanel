@@ -3,10 +3,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 )
@@ -136,12 +138,43 @@ func round2(v float64) float64 {
 
 // wsTerminal — shell interativo via WebSocket + docker exec.
 func (s *Server) wsTerminal(w http.ResponseWriter, r *http.Request) {
+	role := ""
+	if u := userFromContext(r); u != nil {
+		role = u.Role
+	}
+	if err := terminalPolicy(role); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 	dc, err := s.dockerClient(r)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
 	id := chi.URLParam(r, "id")
+	if u := userFromContext(r); u != nil && (len(u.Stacks) > 0 || len(u.Hosts) > 0) {
+		host := hostHeader(r)
+		if host == "" {
+			host = r.URL.Query().Get("host")
+		}
+		if len(u.Hosts) > 0 && !containsStr(u.Hosts, host) {
+			http.Error(w, `{"error":"host fora do escopo"}`, http.StatusForbidden)
+			return
+		}
+		if len(u.Stacks) > 0 {
+			info, err := dc.CLI.ContainerInspect(r.Context(), id)
+			project := ""
+			if err == nil && info.Config != nil {
+				project = info.Config.Labels["com.docker.compose.project"]
+			}
+			if !containsStr(u.Stacks, project) {
+				http.Error(w, `{"error":"stack fora do escopo"}`, http.StatusForbidden)
+				return
+			}
+		}
+	}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -168,6 +201,8 @@ func (s *Server) wsTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 	defer attach.Close()
 
+	s.auditAccess(r, "terminal open", id)
+	var line strings.Builder
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -190,7 +225,21 @@ func (s *Server) wsTerminal(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
+		if mt == websocket.TextMessage {
+			var resize struct {
+				Type string `json:"type"`
+				Cols uint   `json:"cols"`
+				Rows uint   `json:"rows"`
+			}
+			if json.Unmarshal(msg, &resize) == nil && resize.Type == "resize" && resize.Cols > 0 && resize.Rows > 0 {
+				_ = dc.CLI.ContainerExecResize(ctx, execResp.ID, container.ResizeOptions{Width: resize.Cols, Height: resize.Rows})
+				continue
+			}
+		}
 		if mt == websocket.TextMessage || mt == websocket.BinaryMessage {
+			for _, cmd := range consumeTerminalInput(&line, msg) {
+				s.auditAccess(r, "terminal cmd", id+" "+cmd)
+			}
 			if _, err := attach.Conn.Write(msg); err != nil {
 				break
 			}

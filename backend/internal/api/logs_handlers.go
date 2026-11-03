@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"dockpanel/internal/logcenter"
+	"dockerpilot/internal/logcenter"
 )
 
 func (s *Server) searchLogs(w http.ResponseWriter, r *http.Request) {

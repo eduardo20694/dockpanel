@@ -4,37 +4,37 @@ import (
 	"net/http"
 	"time"
 
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/insights"
-	"dockpanel/internal/scan"
-	"dockpanel/internal/stacks"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/insights"
+	"dockerpilot/internal/scan"
+	"dockerpilot/internal/stacks"
 
 	"github.com/docker/docker/api/types"
 )
 
 type ExecutiveSummary struct {
-	GeneratedAt    int64                    `json:"generatedAt"`
-	Hosts          []HostExecutive          `json:"hosts"`
-	TotalCritical  int                      `json:"totalCritical"`
-	TotalWarning   int                      `json:"totalWarning"`
-	StacksCritical int                      `json:"stacksCritical"`
-	SecurityCritical int                    `json:"securityCritical"`
-	LatestTagTotal int                      `json:"latestTagTotal"`
-	DiskPressure   bool                     `json:"diskPressure"`
-	RecentAlerts   []interface{}            `json:"recentAlerts"`
-	TopProblems    []diagnostics.Problem    `json:"topProblems"`
+	GeneratedAt      int64                 `json:"generatedAt"`
+	Hosts            []HostExecutive       `json:"hosts"`
+	TotalCritical    int                   `json:"totalCritical"`
+	TotalWarning     int                   `json:"totalWarning"`
+	StacksCritical   int                   `json:"stacksCritical"`
+	SecurityCritical int                   `json:"securityCritical"`
+	LatestTagTotal   int                   `json:"latestTagTotal"`
+	DiskPressure     bool                  `json:"diskPressure"`
+	RecentAlerts     []interface{}         `json:"recentAlerts"`
+	TopProblems      []diagnostics.Problem `json:"topProblems"`
 }
 
 type HostExecutive struct {
-	ID             string  `json:"id"`
-	Label          string  `json:"label"`
-	Online         bool    `json:"online"`
-	Critical       int     `json:"critical"`
-	Warning        int     `json:"warning"`
-	StacksCritical int     `json:"stacksCritical"`
-	SecurityCritical int   `json:"securityCritical"`
-	DiskReclaimGB  float64 `json:"diskReclaimGB"`
-	TrivyAvailable bool    `json:"trivyAvailable"`
+	ID               string  `json:"id"`
+	Label            string  `json:"label"`
+	Online           bool    `json:"online"`
+	Critical         int     `json:"critical"`
+	Warning          int     `json:"warning"`
+	StacksCritical   int     `json:"stacksCritical"`
+	SecurityCritical int     `json:"securityCritical"`
+	DiskReclaimGB    float64 `json:"diskReclaimGB"`
+	TrivyAvailable   bool    `json:"trivyAvailable"`
 }
 
 func (s *Server) executiveSummary(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"dockerpilot/internal/envx"
 	"log/slog"
 	"os"
 	"time"
@@ -13,7 +14,7 @@ import (
 // When SENTRY_DSN is empty the process runs with structured logs only.
 func Init() {
 	level := slog.LevelInfo
-	if os.Getenv("DOCKPANEL_LOG_DEBUG") == "1" {
+	if envx.Get("LOG_DEBUG") == "1" {
 		level = slog.LevelDebug
 	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})))
@@ -24,7 +25,7 @@ func Init() {
 	}
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
-		Environment:      first(os.Getenv("DOCKPANEL_ENV"), os.Getenv("APP_ENV"), "development"),
+		Environment:      first(envx.Get("ENV"), os.Getenv("APP_ENV"), "development"),
 		TracesSampleRate: 0,
 	})
 	if err != nil {

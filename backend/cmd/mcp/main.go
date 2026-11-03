@@ -8,8 +8,17 @@ import (
 	"log"
 	"strings"
 
-	"dockpanel/internal/deploy"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/apikey"
+	"dockerpilot/internal/audit"
+	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/dockerclient"
+	"dockerpilot/internal/envx"
+	"dockerpilot/internal/gitops"
+	"dockerpilot/internal/kube"
+	"dockerpilot/internal/org"
+	"dockerpilot/internal/resolved"
+	"dockerpilot/internal/secrets"
+	"dockerpilot/internal/updates"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
@@ -44,7 +53,50 @@ func main() {
 		}
 	}
 
-	s := server.NewMCPServer("dockpanel", "0.1.0")
+	dataDir := envx.DataDir()
+	orgs, _ := org.Open(dataDir)
+	aud, _ := audit.Open(dataDir)
+	resolvedStore, _ := resolved.Open(dataDir)
+	keys, _ := apikey.Open(dataDir)
+	gitStore, _ := gitops.Open(dataDir)
+	sec, _ := secrets.Open(dataDir)
+	upd, _ := updates.Open(dataDir)
+	var kubeSources []kube.Source
+	for _, h := range pool.List() {
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
+		}
+	}
+	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
+	kubeSet := kube.Open(kubeSources)
+	if c, err := pool.Get(pool.DefaultID()); err == nil && c != nil && upd != nil {
+		upd.Engine = updates.NewDockerEngine(c.CLI)
+	}
+	if gitStore != nil {
+		gitStore.Start(ctx, aud)
+	}
+	if upd != nil {
+		upd.Start(ctx, aud)
+	}
+
+	s := buildMCP(pool, orgs, aud, resolvedStore, Services{Git: gitStore, Secrets: sec, Updates: upd, Keys: keys, Kube: kubeSet})
+
+	if addr := strings.TrimSpace(envx.Get("MCP_ADDR")); addr != "" {
+		if err := serveHTTP(addr, s, dataDir, aud); err != nil {
+			log.Fatalf("mcp http: %v", err)
+		}
+		return
+	}
+	if err := server.ServeStdio(s); err != nil {
+		log.Fatalf("erro no servidor MCP: %v", err)
+	}
+}
+
+func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store, svc Services) *server.MCPServer {
+	s := server.NewMCPServer("dockpilot", "1.1.0",
+		server.WithInstructions("Dockpilot opera o Docker Engine (socket ou ssh://) sem exigir Portainer. Leia dockpilot_guidance se hesitar. Prefira ferramentas de leitura antes de escrever. DOCKERPILOT_READONLY bloqueia escritas de propósito. Não invente host_id: chame list_environments. Para 'o que quebrou' use what_broke. kubernetes_proxy só existe se DOCKERPILOT_K8S_API estiver definido."),
+		server.WithToolHandlerMiddleware(toolGate(aud)),
+	)
 
 	registerListContainers(s, pool)
 	registerContainerAction(s, pool)
@@ -65,10 +117,12 @@ func main() {
 	registerSecurityAuditTool(s, pool)
 	registerDeepDriftTool(s, pool)
 	registerSearchLogs(s)
-
-	if err := server.ServeStdio(s); err != nil {
-		log.Fatalf("erro no servidor MCP: %v", err)
-	}
+	registerProductTools(s, pool, orgs, aud, resolvedStore)
+	registerCoverageTools(s, pool)
+	registerPlatformTools(s, pool, aud, svc)
+	registerOrchestratorTools(s, pool, svc.Kube)
+	registerGapTools(s)
+	return s
 }
 
 // ---------- list_containers ----------
@@ -113,6 +167,9 @@ func registerContainerAction(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		dc, err := hostClient(pool, hostIDFrom(req, pool))
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -267,7 +324,7 @@ func registerScanProblems(s *server.MCPServer, pool *dockerclient.Pool) {
 		var sb strings.Builder
 		for _, p := range problems {
 			fmt.Fprintf(&sb, "[%s] %s — %s (estado: %s, exit: %d, restarts: %d, id: %s)\n",
-				strings.ToUpper(string(p.Severity)), p.Name, p.Reason, p.State, p.ExitCode, p.RestartCount, p.ContainerID[:12])
+				strings.ToUpper(string(p.Severity)), p.Name, p.Reason, p.State, p.ExitCode, p.RestartCount, shortID(p.ContainerID))
 		}
 		return mcp.NewToolResultText(sb.String()), nil
 	})
@@ -294,7 +351,7 @@ func registerSafePrune(s *server.MCPServer, pool *dockerclient.Pool) {
 		if err == nil && len(imgs) > 0 {
 			sb.WriteString("Imagens dangling (sobra de build, seguras de remover):\n")
 			for _, img := range imgs {
-				fmt.Fprintf(&sb, "  - %s (%.1f MB)\n", img.ID[:19], float64(img.Size)/1e6)
+				fmt.Fprintf(&sb, "  - %s (%.1f MB)\n", shortID(img.ID), float64(img.Size)/1e6)
 				total += img.Size
 			}
 		}
@@ -342,6 +399,9 @@ func registerRemoveResource(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("host_id", mcp.Description("id do host (list_hosts)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		dc, err := hostClient(pool, hostIDFrom(req, pool))
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -410,6 +470,9 @@ func registerDeployCompose(s *server.MCPServer, pool *dockerclient.Pool) {
 		mcp.WithString("detach", mcp.Description("true/false — incluir -d no up (padrão true para up)")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := ensureWritable(); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 		hostID := req.GetString("host_id", pool.DefaultID())
 		dockerHost := dockerHostFor(pool, hostID)
 		path := strings.TrimSpace(req.GetString("project_path", ""))

@@ -6,7 +6,7 @@ export function PageShell({ children }: { children: ReactNode }) {
 
 export function PageInner({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
-    <div className={`page-inner animate-slide-up ${wide ? 'max-w-[1320px]' : ''}`}>{children}</div>
+    <div className={`page-inner ${wide ? 'max-w-[1320px]' : ''}`}>{children}</div>
   )
 }
 
@@ -28,13 +28,13 @@ export function PageHeader({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className={`font-display font-bold tracking-tight text-text ${large ? 'text-3xl' : 'text-2xl'}`}>
+            <h1 className={`font-display font-bold tracking-tight text-text ${large ? 'text-4xl' : 'text-3xl'}`}>
               {title}
             </h1>
             {badge}
           </div>
           {description && (
-            <p className="text-[15px] text-text-muted leading-relaxed max-w-2xl">{description}</p>
+            <p className="text-[15px] font-medium text-text-secondary leading-relaxed max-w-2xl">{description}</p>
           )}
         </div>
         {action}
@@ -158,14 +158,10 @@ export function Btn({
 
 export function EmptyState({ title, description }: { title: string; description?: string }) {
   return (
-    <Card glow className="p-14 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-accent-muted ring-1 ring-accent-border flex items-center justify-center mx-auto mb-4">
-        <svg className="w-6 h-6 text-tone-brand-strong" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
-        </svg>
-      </div>
-      <div className="font-display font-semibold text-lg text-text mb-1">{title}</div>
-      {description && <div className="text-sm text-text-muted max-w-sm mx-auto">{description}</div>}
+    <Card className="px-8 py-20 text-center">
+      <div className="mx-auto mb-5 h-px w-10 bg-border-strong" />
+      <div className="font-display font-medium text-lg tracking-tight text-text mb-2">{title}</div>
+      {description && <div className="text-sm text-text-muted max-w-md mx-auto leading-relaxed">{description}</div>}
     </Card>
   )
 }

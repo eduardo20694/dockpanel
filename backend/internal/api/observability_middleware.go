@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"dockpanel/internal/observability"
+	"dockerpilot/internal/observability"
 
 	"github.com/google/uuid"
 )
