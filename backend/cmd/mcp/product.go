@@ -10,23 +10,26 @@ import (
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/cost"
 	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/discover"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
+	"dockerpilot/internal/kube"
 	"dockerpilot/internal/org"
 	"dockerpilot/internal/proxy"
 	"dockerpilot/internal/resolved"
 	"dockerpilot/internal/triage"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func registerProductTools(s *server.MCPServer, pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store) {
+func registerProductTools(s *server.MCPServer, pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolvedStore *resolved.Store, clusters *kube.Set) {
 	registerWhatBroke(s, pool)
 	registerResolveProblem(s, resolvedStore)
-	registerListEnvironments(s, pool)
+	registerListEnvironments(s, pool, clusters)
 	registerUsersAndTeams(s, orgs)
 	registerStackWrite(s)
 	registerProxies(s, pool)
@@ -128,14 +131,48 @@ func registerResolveProblem(s *server.MCPServer, st *resolved.Store) {
 	})
 }
 
-func registerListEnvironments(s *server.MCPServer, pool *dockerclient.Pool) {
+func registerListEnvironments(s *server.MCPServer, pool *dockerclient.Pool, clusters *kube.Set) {
 	tool := mcp.NewTool("list_environments",
-		mcp.WithDescription("Lista os ambientes Docker do Dockpilot (equivalente aos environments do Portainer, sem API do Portainer). Cada item tem id, label e dockerHost (vazio = socket local, ssh:// = host remoto). Passe o id como host_id nas outras ferramentas. Somente leitura."),
+		mcp.WithDescription("Lista os ambientes e o tipo detectado (docker, podman, swarm manager/worker ou kubernetes), o status e o motivo. A gestão do Swarm só existe quando role é manager. Passe o id como host_id. Somente leitura."),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		raw, _ := json.MarshalIndent(pool.List(), "", "  ")
+		raw, _ := json.MarshalIndent(describeEnvironments(ctx, pool, clusters), "", "  ")
 		return mcp.NewToolResultText(string(raw)), nil
 	})
+}
+
+func describeEnvironments(ctx context.Context, pool *dockerclient.Pool, clusters *kube.Set) []map[string]any {
+	var out []map[string]any
+	if pool != nil {
+		for _, h := range pool.List() {
+			kind := strings.ToLower(strings.TrimSpace(h.Kind))
+			if kind == "kubernetes" || kind == "k8s" || h.Kubeconfig != "" {
+				continue
+			}
+			var cli *client.Client
+			if dc, err := pool.Get(h.ID); err == nil && dc != nil {
+				cli = dc.CLI
+			}
+			view := discover.Classify(h.Kind, discover.ProbeEngine(ctx, cli, h.DockerHost))
+			out = append(out, map[string]any{
+				"id": h.ID, "label": h.Label, "dockerHost": h.DockerHost,
+				"kind": view.Kind, "detectedKind": view.DetectedKind, "role": view.Role,
+				"status": view.Status, "detail": view.Detail, "capabilities": view.Capabilities, "manual": view.Manual,
+			})
+		}
+	}
+	if clusters != nil {
+		for _, c := range clusters.List() {
+			out = append(out, map[string]any{
+				"id": c.ID, "label": c.Label, "kind": "kubernetes", "detectedKind": "kubernetes",
+				"status": c.Status, "detail": c.Detail, "capabilities": []string{"workloads", "pods", "services", "eventos"},
+			})
+		}
+	}
+	if out == nil {
+		out = []map[string]any{}
+	}
+	return out
 }
 
 func registerUsersAndTeams(s *server.MCPServer, orgs *org.Store) {

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useHost } from '../context/HostContext'
+import { useHost, type DockerHost } from '../context/HostContext'
 import { useNav } from '../context/NavContext'
 
 const groups = [
@@ -50,8 +50,18 @@ const groups = [
   },
 ]
 
+function visible<T extends { to: string }>(items: T[], hosts: DockerHost[], hostKind: string, hostRole: string) {
+  const manager = hosts.some((h) => h.kind === 'swarm' && h.role === 'manager') || (hostKind === 'swarm' && hostRole === 'manager')
+  const cluster = hosts.some((h) => h.kind === 'kubernetes' || h.kind === 'k8s') || hostKind === 'kubernetes'
+  return items.filter((it) => {
+    if (it.to === '/swarm') return manager
+    if (it.to === '/kubernetes') return cluster
+    return true
+  })
+}
+
 export default function Sidebar() {
-  const { hostLabel } = useHost()
+  const { hostLabel, hosts, hostKind, hostRole } = useHost()
   const { open, close } = useNav()
   const location = useLocation()
 
@@ -86,7 +96,7 @@ export default function Sidebar() {
               {g.label}
             </div>
             <div className="space-y-0.5">
-              {g.items.map((it) => {
+              {visible(g.items, hosts, hostKind, hostRole).map((it) => {
                 const active = isActive(it.to)
                 const Icon = it.icon
                 return (

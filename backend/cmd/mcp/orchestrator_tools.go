@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"fmt"
+
+	"dockerpilot/internal/discover"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/kube"
 	"dockerpilot/internal/swarm"
@@ -18,10 +21,29 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		raw, _ := json.MarshalIndent(v, "", "  ")
 		return mcp.NewToolResultText(string(raw))
 	}
-	cliOf := func(req mcp.CallToolRequest) (*client.Client, error) {
-		dc, err := hostClient(pool, req.GetString("host_id", ""))
+	cliOf := func(ctx context.Context, req mcp.CallToolRequest) (*client.Client, error) {
+		id := req.GetString("host_id", "")
+		dc, err := hostClient(pool, id)
 		if err != nil {
 			return nil, err
+		}
+		dockerHost := ""
+		kind := "auto"
+		if pool != nil {
+			for _, h := range pool.List() {
+				if h.ID == id || (id == "" && h.ID == pool.DefaultID()) {
+					dockerHost = h.DockerHost
+					kind = h.Kind
+				}
+			}
+		}
+		view := discover.Classify(kind, discover.ProbeEngine(ctx, dc.CLI, dockerHost))
+		if !view.ManageSwarm() {
+			msg := view.Detail
+			if msg == "" {
+				msg = "a gestão do Swarm só está disponível num manager"
+			}
+			return nil, fmt.Errorf("%s", msg)
 		}
 		return dc.CLI, nil
 	}
@@ -38,7 +60,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 	}
 
 	add("swarm_nodes", "Lista os nós do Swarm no ambiente.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -49,7 +71,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(list), nil
 	})
 	add("swarm_services", "Lista serviços do Swarm, com imagem, réplicas e stack.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -60,7 +82,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(list), nil
 	})
 	add("swarm_tasks", "Lista as tasks de um serviço Swarm.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -71,7 +93,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(list), nil
 	}, mcp.WithString("service", mcp.Required()))
 	add("swarm_logs", "Lê o log de um serviço Swarm.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -85,7 +107,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		if err := ensureWritable(); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -98,7 +120,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		if err := ensureWritable(); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -111,7 +133,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		if err := ensureWritable(); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -121,7 +143,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(map[string]bool{"ok": true}), nil
 	}, mcp.WithString("service", mcp.Required()))
 	add("swarm_secrets", "Lista secrets do Swarm. O conteúdo não é devolvido.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -132,7 +154,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(list), nil
 	})
 	add("swarm_configs", "Lista configs do Swarm.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -143,7 +165,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		return text(list), nil
 	})
 	add("swarm_stacks", "Lista stacks pelo rótulo com.docker.stack.namespace.", func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -157,7 +179,7 @@ func registerOrchestratorTools(s *server.MCPServer, pool *dockerclient.Pool, clu
 		if err := ensureWritable(); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		cli, err := cliOf(req)
+		cli, err := cliOf(ctx, req)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

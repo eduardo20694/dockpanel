@@ -4,14 +4,17 @@ import { useHost } from '../context/HostContext'
 import { PageShell, PageInner, PageHeader, Card, Section } from '../components/ui'
 
 export default function Swarm() {
-  const { hostKind, hostLabel } = useHost()
+  const { hostKind, hostLabel, hostRole, hostDetail } = useHost()
   const [nodes, setNodes] = useState<{ hostname: string; role: string; state: string; leader: boolean }[]>([])
   const [services, setServices] = useState<{ name: string; image: string; replicas: number; running: number; stack?: string }[]>([])
   const [stacks, setStacks] = useState<{ name: string; services: string[] }[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (hostKind !== 'swarm') {
+    if (hostKind !== 'swarm' || hostRole === 'worker') {
+      setNodes([])
+      setServices([])
+      setStacks([])
       setError('')
       return
     }
@@ -23,13 +26,14 @@ export default function Swarm() {
         setError('')
       })
       .catch((e: Error) => setError(e.message))
-  }, [hostKind])
+  }, [hostKind, hostRole])
 
   return (
     <PageShell>
       <PageInner wide>
         <PageHeader large title="Swarm" description={`Serviços, stacks, nós, secrets e configs de ${hostLabel}. Escala, rolling update e rollback respeitam o papel e o modo somente leitura.`} badge={<span className="badge-neutral">{hostKind}</span>} />
-        {hostKind !== 'swarm' && <Card className="p-5 mb-6">Este ambiente é {hostKind}. Escolha um manager Swarm no seletor.</Card>}
+        {hostKind === 'swarm' && hostRole === 'worker' && <Card className="p-5 mb-6">Este nó é worker. A gestão do Swarm fica no manager. {hostDetail}</Card>}
+        {hostKind !== 'swarm' && <Card className="p-5 mb-6">Este ambiente é {hostKind}. Escolha um manager Swarm no seletor. {hostDetail}</Card>}
         {error && <p className="text-sm text-tone-danger mb-4">{error}</p>}
         <Section title="Nós">
           <Card className="overflow-hidden">

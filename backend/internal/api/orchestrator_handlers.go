@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
 
+	"dockerpilot/internal/discover"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
 	"dockerpilot/internal/kube"
@@ -27,12 +29,21 @@ func (s *Server) engine(r *http.Request) (engine, error) {
 	}
 	id := dockerclient.HostIDFromRequest(hostHeader(r), r.URL.Query().Get("host"))
 	host := ""
+	cfgKind := "auto"
 	if s.Hosts != nil {
 		for _, h := range s.Hosts.List() {
 			if h.ID == id || (id == "" && h.ID == s.Hosts.DefaultID()) {
 				host = h.DockerHost
+				cfgKind = h.Kind
 			}
 		}
+	}
+	view := discover.Classify(cfgKind, discover.ProbeEngine(r.Context(), dc.CLI, host))
+	if !view.ManageSwarm() {
+		if view.Detail == "" {
+			return engine{}, errors.New("a gestão do Swarm só está disponível num manager")
+		}
+		return engine{}, errors.New(view.Detail)
 	}
 	return engine{cli: dc.CLI, dockerHost: host}, nil
 }

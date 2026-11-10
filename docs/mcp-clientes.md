@@ -98,5 +98,5 @@ O webhook de GitOps é `POST /api/gitops/webhook`, com `X-Hub-Signature-256` (Gi
 
 ## Swarm e Kubernetes
 
-`host_id` escolhe o ambiente (`list_environments`). Swarm: `swarm_nodes`, `swarm_services`, `swarm_tasks`, `swarm_logs`, `swarm_scale`, `swarm_update`, `swarm_rollback`, `swarm_secrets`, `swarm_configs`, `swarm_stacks`, `swarm_stack_deploy`. Kubernetes: `k8s_namespaces`, `k8s_workloads`, `k8s_pods`, `k8s_pod_logs`, `k8s_what_broke`, `k8s_events`, `k8s_apply`, `k8s_scale`, `k8s_rollout`, `k8s_undo`. O cluster entra por `DOCKERPILOT_KUBECONFIG` ou por um host `kind: kubernetes` em `DOCKERPILOT_HOSTS`.
+`list_environments` devolve o tipo detectado (`kind`, `detectedKind`, `role`, `status`, `detail`, `capabilities`). `kind` vazio ou `auto` em `DOCKERPILOT_HOSTS` segue a detecção; um kind explícito permanece. Swarm só é gerível quando `role` é `manager`. `host_id` escolhe o ambiente. Swarm: `swarm_nodes`, `swarm_services`, `swarm_tasks`, `swarm_logs`, `swarm_scale`, `swarm_update`, `swarm_rollback`, `swarm_secrets`, `swarm_configs`, `swarm_stacks`, `swarm_stack_deploy`. Kubernetes: `k8s_namespaces`, `k8s_workloads`, `k8s_pods`, `k8s_pod_logs`, `k8s_what_broke`, `k8s_events`, `k8s_apply`, `k8s_scale`, `k8s_rollout`, `k8s_undo`. O cluster entra por `DOCKERPILOT_KUBECONFIG` ou por um host `kind: kubernetes` em `DOCKERPILOT_HOSTS`.
 

@@ -33,9 +33,11 @@ async function mockApi(page: Page, opts?: { anonymous?: boolean }) {
     if (p.endsWith('/auth/logout')) return json({ ok: true })
     if (p.endsWith('/hosts')) {
       return json({ defaultHost: 'prod', hosts: [
-        { id: 'prod', label: 'Produção', dockerHost: '', kind: 'docker' },
-        { id: 'swarm', label: 'Swarm local', dockerHost: '', kind: 'swarm' },
-        { id: 'kind', label: 'Kind', dockerHost: '', kind: 'kubernetes' },
+        { id: 'prod', label: 'Produção', dockerHost: '', kind: 'docker', detectedKind: 'docker', status: 'online', detail: 'Docker sem Swarm ativo.', capabilities: ['containers', 'compose', 'imagens'] },
+        { id: 'swarm', label: 'Swarm local', dockerHost: '', kind: 'swarm', detectedKind: 'swarm', role: 'manager', status: 'online', detail: 'Docker com Swarm ativo. Este nó é manager.', capabilities: ['containers', 'swarm'] },
+        { id: 'worker', label: 'Worker', dockerHost: '', kind: 'swarm', detectedKind: 'swarm', role: 'worker', status: 'online', detail: 'Este nó é worker: a gestão do Swarm fica no manager.' },
+        { id: 'kind', label: 'Kind', dockerHost: '', kind: 'kubernetes', detectedKind: 'kubernetes', status: 'online', detail: 'Contexto kind-dockpilot descoberto no kubeconfig.' },
+        { id: 'old', label: 'Cluster antigo', dockerHost: '', kind: 'kubernetes', detectedKind: 'kubernetes', status: 'offline', detail: 'Falha de conexão: connection refused' },
       ] })
     }
     if (p.endsWith('/swarm/nodes')) return json({ nodes: [{ id: 'n1', hostname: 'manager', role: 'manager', state: 'ready', leader: true }] })
@@ -295,6 +297,13 @@ test('telas principais nos dois temas', async ({ page }) => {
   await expect(page.getByText('comandos entram na auditoria')).toBeVisible()
   await shot(page, 'terminal')
 
+  await page.evaluate(() => localStorage.setItem('dockerpilot-host', 'old'))
+  await page.goto('/')
+  await expect(page.getByLabel('Ambiente')).toHaveValue('old')
+  await expect(page.getByText('Falha de conexão: connection refused')).toBeVisible()
+  await shot(page, 'ambiente')
+  await page.evaluate(() => localStorage.setItem('dockerpilot-host', 'prod'))
+
   await page.goto('/problems')
   await page.getByRole('button', { name: 'Marcar resolvido', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Erros & diagnóstico' })).toBeVisible()
@@ -317,6 +326,12 @@ test('telas principais nos dois temas', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await shot(page, `${file}-dia`)
   }
+  await page.evaluate(() => localStorage.setItem('dockerpilot-host', 'worker'))
+  await page.goto('/')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.getByText('Este nó é worker: a gestão do Swarm fica no manager.')).toBeVisible()
+  await shot(page, 'ambiente-dia')
+  await page.evaluate(() => localStorage.setItem('dockerpilot-host', 'prod'))
   await page.goto('/containers')
   await page.getByRole('button', { name: 'Ações do container' }).click()
   await page.getByRole('menuitem', { name: 'Terminal' }).click()

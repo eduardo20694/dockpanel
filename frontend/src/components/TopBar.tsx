@@ -52,7 +52,7 @@ export default function TopBar() {
   const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between gap-3 px-3 sm:px-6 lg:px-8 border-b border-border-strong glass sticky top-0 z-30">
+    <header className="min-h-14 shrink-0 flex items-center justify-between gap-3 px-3 sm:px-6 lg:px-8 py-2 border-b border-border-strong glass sticky top-0 z-30">
       <div className="flex items-center gap-2 sm:gap-3 text-sm min-w-0">
         <button
           type="button"

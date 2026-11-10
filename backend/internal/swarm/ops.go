@@ -71,8 +71,12 @@ func Active(ctx context.Context, cli *client.Client) error {
 	if err != nil {
 		return err
 	}
+	state := info.Swarm.LocalNodeState
+	if state != swarm.LocalNodeStateActive {
+		return fmt.Errorf("este ambiente não tem Swarm ativo")
+	}
 	if !info.Swarm.ControlAvailable {
-		return fmt.Errorf("este host não é manager de Swarm")
+		return fmt.Errorf("este nó é worker: a gestão do Swarm fica no manager")
 	}
 	return nil
 }

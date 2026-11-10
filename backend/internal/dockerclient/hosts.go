@@ -60,7 +60,7 @@ func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 	}
 	for i := range p.hosts {
 		if p.hosts[i].Kind == "" {
-			p.hosts[i].Kind = "docker"
+			p.hosts[i].Kind = "auto"
 		}
 		h := p.hosts[i]
 		p.baseline[h.ID] = h

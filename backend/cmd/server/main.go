@@ -16,6 +16,7 @@ import (
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/auth"
 	"dockerpilot/internal/collector"
+	"dockerpilot/internal/discover"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
 	"dockerpilot/internal/gitops"
@@ -157,10 +158,10 @@ func main() {
 	}
 
 	var kubeSources []kube.Source
-	for _, h := range pool.List() {
-		if h.Kind == "kubernetes" || h.Kind == "k8s" {
-			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
-		}
+	for _, target := range discover.KubeTargetsFromHosts(pool.List()) {
+		kubeSources = append(kubeSources, kube.Source{
+			ID: target.ID, Label: target.Label, Kubeconfig: target.Kubeconfig, Context: target.Context, InCluster: target.InCluster,
+		})
 	}
 	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
 	kubeSet := kube.Open(kubeSources)

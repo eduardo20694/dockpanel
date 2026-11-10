@@ -11,6 +11,7 @@ import (
 	"dockerpilot/internal/apikey"
 	"dockerpilot/internal/audit"
 	"dockerpilot/internal/deploy"
+	"dockerpilot/internal/discover"
 	"dockerpilot/internal/dockerclient"
 	"dockerpilot/internal/envx"
 	"dockerpilot/internal/gitops"
@@ -62,10 +63,10 @@ func main() {
 	sec, _ := secrets.Open(dataDir)
 	upd, _ := updates.Open(dataDir)
 	var kubeSources []kube.Source
-	for _, h := range pool.List() {
-		if h.Kind == "kubernetes" || h.Kind == "k8s" {
-			kubeSources = append(kubeSources, kube.Source{ID: h.ID, Label: h.Label, Kubeconfig: h.Kubeconfig, Context: h.Context})
-		}
+	for _, target := range discover.KubeTargetsFromHosts(pool.List()) {
+		kubeSources = append(kubeSources, kube.Source{
+			ID: target.ID, Label: target.Label, Kubeconfig: target.Kubeconfig, Context: target.Context, InCluster: target.InCluster,
+		})
 	}
 	kubeSources = append(kubeSources, kube.SourcesFromEnv()...)
 	kubeSet := kube.Open(kubeSources)
@@ -117,7 +118,7 @@ func buildMCP(pool *dockerclient.Pool, orgs *org.Store, aud *audit.Log, resolved
 	registerSecurityAuditTool(s, pool)
 	registerDeepDriftTool(s, pool)
 	registerSearchLogs(s)
-	registerProductTools(s, pool, orgs, aud, resolvedStore)
+	registerProductTools(s, pool, orgs, aud, resolvedStore, svc.Kube)
 	registerCoverageTools(s, pool)
 	registerPlatformTools(s, pool, aud, svc)
 	registerOrchestratorTools(s, pool, svc.Kube)

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"dockerpilot/internal/discover"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -15,6 +18,8 @@ import (
 type Cluster struct {
 	ID     string
 	Label  string
+	Status string
+	Detail string
 	Config *rest.Config
 	Client kubernetes.Interface
 }
@@ -42,7 +47,7 @@ func (s *Set) List() []Cluster {
 	}
 	out := make([]Cluster, 0, len(s.clusters))
 	for _, c := range s.clusters {
-		out = append(out, Cluster{ID: c.ID, Label: c.Label})
+		out = append(out, Cluster{ID: c.ID, Label: c.Label, Status: c.Status, Detail: c.Detail})
 	}
 	return out
 }
@@ -74,7 +79,11 @@ func Open(sources []Source) *Set {
 	for _, src := range sources {
 		c, err := openOne(src)
 		if err != nil {
-			clusters = append(clusters, &Cluster{ID: src.ID, Label: src.Label + " (" + err.Error() + ")"})
+			detail := "Falha de conexão: " + err.Error()
+			if src.Context != "" {
+				detail = "Contexto " + src.Context + ": " + detail
+			}
+			clusters = append(clusters, &Cluster{ID: src.ID, Label: src.Label, Status: "offline", Detail: detail})
 			continue
 		}
 		clusters = append(clusters, c)
@@ -104,11 +113,26 @@ func openOne(src Source) (*Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
+	probeCfg := rest.CopyConfig(cfg)
+	probeCfg.Timeout = 4 * time.Second
+	prober, err := kubernetes.NewForConfig(probeCfg)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := prober.Discovery().ServerVersion(); err != nil {
+		return nil, err
+	}
 	label := src.Label
 	if label == "" {
 		label = src.ID
 	}
-	return &Cluster{ID: src.ID, Label: label, Config: cfg, Client: cs}, nil
+	status, detail := "online", "Cluster acessível."
+	if src.InCluster {
+		detail = "Conta de serviço do pod."
+	} else if src.Context != "" {
+		detail = "Contexto " + src.Context + " do kubeconfig."
+	}
+	return &Cluster{ID: src.ID, Label: label, Status: status, Detail: detail, Config: cfg, Client: cs}, nil
 }
 
 // SourcesFromEnv lê DOCKERPILOT_KUBECONFIG (caminho ou lista separada por vírgula)
@@ -130,11 +154,14 @@ func SourcesFromEnv() []Source {
 			if len(parts) > 1 {
 				id = fmt.Sprintf("k8s-%d", i+1)
 			}
-			out = append(out, Source{ID: id, Label: id, Kubeconfig: p})
+			targets, _ := discover.ExpandKube(id, id, p, "")
+			for _, target := range targets {
+				out = append(out, Source{ID: target.ID, Label: target.Label, Kubeconfig: target.Kubeconfig, Context: target.Context})
+			}
 		}
 	}
-	if os.Getenv("DOCKERPILOT_K8S_INCLUSTER") == "1" {
-		out = append(out, Source{ID: "incluster", Label: "in-cluster", InCluster: true})
+	if os.Getenv("DOCKERPILOT_K8S_INCLUSTER") == "1" || discover.ServiceAccountPresent() {
+		out = append(out, Source{ID: "incluster", Label: "Cluster local", InCluster: true})
 	}
 	return out
 }

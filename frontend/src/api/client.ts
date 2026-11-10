@@ -81,7 +81,7 @@ export const api = {
     rollout: (body: { kind: string; namespace: string; name: string }) => request('/k8s/rollout', { method: 'POST', body: JSON.stringify(body) }),
   },
   hosts: {
-    list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string; kind?: string }[] }>('/hosts'),
+    list: () => request<{ defaultHost: string; hosts: { id: string; label: string; dockerHost: string; kind?: string; detectedKind?: string; role?: string; status?: string; detail?: string; capabilities?: string[] }[] }>('/hosts'),
   },
   executive: {
     summary: () => request<any>('/executive'),

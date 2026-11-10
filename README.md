@@ -17,7 +17,7 @@ Não reimplementamos Edge, Helm nem o catálogo inteiro de ~380 rotas do Portain
 | Capacidade | Portainer MCP | Dockpilot |
 |---|---|---|
 | Onde roda | Na frente de um Portainer | No host, socket ou `ssh://`, sem Portainer |
-| Vários ambientes | Endpoints do Portainer | `DOCKERPILOT_HOSTS` (local e SSH) |
+| Vários ambientes | Endpoints do Portainer | `DOCKERPILOT_HOSTS` (local, SSH ou Podman). O tipo é detectado; `kind` manual continua valendo |
 | Usuários, times, RBAC | Perfil ADMIN, via API do Portainer | Diretório local: admin, operator, auditor, viewer |
 | Organizações | O próprio Portainer | Multi-tenant em `orgs.json` |
 | Stack criar / atualizar | Sim, pela API do Portainer | Sim, com revisão do compose |
@@ -124,6 +124,10 @@ cd backend && go build -o dockerpilot-mcp ./cmd/mcp
 ```
 
 Ferramentas novas em relação ao painel antigo: `list_environments`, `list_users`, `create_user`, `list_teams`, `create_team`, `add_team_member`, `create_stack`, `update_stack`, `rollback_stack`, `docker_proxy`, `kubernetes_proxy`, `what_broke`, `resolve_problem`, `list_audit`, `cost_insights`, `dockpilot_guidance`. As ferramentas de diagnóstico, Trivy, drift, prune, backup e logs continuam.
+
+## Descoberta do ambiente
+
+Com `kind` vazio ou `auto` em `DOCKERPILOT_HOSTS`, o Dockpilot lê o daemon. Sem Swarm, a experiência é Docker ou Podman (pelo socket `podman.sock` ou pelo nome que o daemon anuncia). Com Swarm ativo, um manager abre a gestão; um worker mostra o motivo e esconde essa gestão. Um kubeconfig vira um ambiente por contexto. A conta de serviço em `/var/run/secrets/kubernetes.io/serviceaccount` entra sozinha. `kind`, `context` e `DOCKERPILOT_KUBECONFIG` continuam valendo quando a detecção não basta ou quando há mais de um contexto. O seletor mostra tipo, papel, status e o motivo. `list_environments` devolve o mesmo.
 
 ## GitOps, cofre e atendimento
 
