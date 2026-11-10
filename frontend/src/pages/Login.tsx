@@ -33,7 +33,7 @@ export default function Login() {
       <div className="login-topbar">
         <span className="font-display font-bold text-text inline-flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="w-6 h-6 rounded-md" width={24} height={24} />
-          Dockwatch
+          Dockpilot
         </span>
         <ThemeToggle />
       </div>
@@ -41,11 +41,11 @@ export default function Login() {
       <div className="login-center">
         <div className="login-brand">
           <div className="login-logo !p-0 overflow-hidden bg-transparent shadow-none">
-            <img src="/favicon.svg" alt="Dockwatch" className="w-full h-full" width={56} height={56} />
+            <img src="/favicon.svg" alt="Dockpilot" className="w-full h-full" width={56} height={56} />
           </div>
           <div>
-            <h1 className="login-title">Dockwatch</h1>
-            <p className="login-tagline">Operações Docker self-hosted</p>
+            <h1 className="login-title">Dockpilot</h1>
+            <p className="login-tagline">Operações Docker para a organização</p>
           </div>
         </div>
 

@@ -43,6 +43,9 @@ export default function ContainerTerminal({
     }
     ws.onclose = () => term.writeln('\r\n[sessão encerrada]')
     term.onData((data) => { if (ws.readyState === WebSocket.OPEN) ws.send(data) })
+    term.onResize(({ cols, rows }) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols, rows }))
+    })
 
     const onResize = () => fit.fit()
     window.addEventListener('resize', onResize)
@@ -56,6 +59,7 @@ export default function ContainerTerminal({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-brand" />
             <span className="font-mono text-sm text-text-muted">terminal · <span className="text-text font-medium">{containerName}</span></span>
+            <span className="text-xs text-text-faint">comandos entram na auditoria</span>
           </div>
           <button onClick={onClose} className="btn-ghost text-xs">Fechar</button>
         </div>

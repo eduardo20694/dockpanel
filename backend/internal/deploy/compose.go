@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"dockerpilot/internal/envx"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -22,12 +23,14 @@ var composeFileNames = []string{
 }
 
 type ComposeRequest struct {
-	ProjectPath string `json:"projectPath"`
-	Action      string `json:"action"`
-	Build       bool   `json:"build"`
-	Detach      bool   `json:"detach"`
-	DockerHost  string `json:"dockerHost"`
-	Tail        int    `json:"tail"` // logs: linhas (padrão 100)
+	ProjectPath string            `json:"projectPath"`
+	Action      string            `json:"action"`
+	Build       bool              `json:"build"`
+	Detach      bool              `json:"detach"`
+	DockerHost  string            `json:"dockerHost"`
+	Tail        int               `json:"tail"` // logs: linhas (padrão 100)
+	ExtraEnv    []string          `json:"-"`
+	SecretFiles map[string][]byte `json:"-"`
 }
 
 type ServiceStatus struct {
@@ -59,7 +62,7 @@ type Preset struct {
 // DefaultComposePath devolve a pasta do compose (env ou descoberta a partir do cwd).
 // Não usa path hardcoded — evita 502 em máquinas sem /root/dockpanel.
 func DefaultComposePath() string {
-	if p := strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH")); p != "" {
+	if p := strings.TrimSpace(envx.Get("COMPOSE_PATH")); p != "" {
 		return p
 	}
 	return discoverComposePath()
@@ -188,12 +191,25 @@ func RunCompose(ctx context.Context, req ComposeRequest) (*ComposeResult, error)
 	defer cancel()
 
 	start := time.Now()
+	for rel, content := range req.SecretFiles {
+		if strings.Contains(rel, "..") || filepath.IsAbs(rel) {
+			return nil, fmt.Errorf("arquivo de segredo inválido")
+		}
+		dest := filepath.Join(path, rel)
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(dest, content, 0o600); err != nil {
+			return nil, err
+		}
+	}
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = path
 	env := os.Environ()
 	if req.DockerHost != "" {
 		env = append(env, "DOCKER_HOST="+req.DockerHost)
 	}
+	env = append(env, req.ExtraEnv...)
 	cmd.Env = env
 
 	var out bytes.Buffer

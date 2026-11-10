@@ -3,7 +3,7 @@ package dockerclient_test
 import (
 	"testing"
 
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/dockerclient"
 )
 
 func TestGetIfAllowedBlocksForeignHost(t *testing.T) {

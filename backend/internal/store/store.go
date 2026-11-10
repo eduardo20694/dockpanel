@@ -2,6 +2,7 @@ package store
 
 import (
 	"bufio"
+	"dockerpilot/internal/envx"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ type Store struct {
 func Open(path string) (*Store, error) {
 	dir := path
 	if dir == "" {
-		dir = os.Getenv("DOCKPANEL_DATA_DIR")
+		dir = envx.Get("DATA_DIR")
 		if dir == "" {
 			dir = "data"
 		}
@@ -33,14 +34,14 @@ func Open(path string) (*Store, error) {
 func (s *Store) Close() error { return nil }
 
 type metricRow struct {
-	HostID       string  `json:"hostId"`
-	ContainerID  string  `json:"containerId"`
-	ContainerName string `json:"containerName"`
-	CPUPct       float64 `json:"cpuPct"`
-	MemPct       float64 `json:"memPct"`
-	MemUsage     uint64  `json:"memUsage"`
-	RestartCount int     `json:"restartCount"`
-	Timestamp    int64   `json:"timestamp"`
+	HostID        string  `json:"hostId"`
+	ContainerID   string  `json:"containerId"`
+	ContainerName string  `json:"containerName"`
+	CPUPct        float64 `json:"cpuPct"`
+	MemPct        float64 `json:"memPct"`
+	MemUsage      uint64  `json:"memUsage"`
+	RestartCount  int     `json:"restartCount"`
+	Timestamp     int64   `json:"timestamp"`
 }
 
 type MetricSample struct {
@@ -288,7 +289,7 @@ func splitLines(data []byte) [][]byte {
 }
 
 func DefaultRetention() time.Duration {
-	if v := os.Getenv("DOCKPANEL_HISTORY_DAYS"); v != "" {
+	if v := envx.Get("HISTORY_DAYS"); v != "" {
 		var days int
 		if _, err := fmt.Sscanf(v, "%d", &days); err == nil && days > 0 {
 			return time.Duration(days) * 24 * time.Hour

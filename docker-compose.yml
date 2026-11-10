@@ -1,5 +1,6 @@
-# Segredos vêm do .env / Environment do Portainer — nada de senha aqui.
-# Nome do serviço e rede alinhados com a stack Portainer (dockepanel).
+# Segredos vêm do .env / Environment — nada de senha aqui.
+# O processo dentro da imagem é o binário dockerpilot.
+# DOCKPANEL_* continua aceito pela API quando DOCKERPILOT_* não está definido.
 
 services:
   dockpanel:

@@ -1,6 +1,7 @@
 package dockerclient
 
 import (
+	"dockerpilot/internal/envx"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +12,10 @@ import (
 type HostConfig struct {
 	ID         string `json:"id"`
 	Label      string `json:"label"`
+	Kind       string `json:"kind,omitempty"`
 	DockerHost string `json:"dockerHost"`
+	Kubeconfig string `json:"kubeconfig,omitempty"`
+	Context    string `json:"context,omitempty"`
 }
 
 type Pool struct {
@@ -23,14 +27,14 @@ type Pool struct {
 }
 
 func NewPoolFromEnv() (*Pool, error) {
-	raw := os.Getenv("DOCKPANEL_HOSTS")
+	raw := envx.GetRaw("HOSTS")
 	if raw != "" {
 		var hosts []HostConfig
 		if err := json.Unmarshal([]byte(raw), &hosts); err != nil {
-			return nil, fmt.Errorf("DOCKPANEL_HOSTS inválido: %w", err)
+			return nil, fmt.Errorf("DOCKERPILOT_HOSTS (ou DOCKPANEL_HOSTS) inválido: %w", err)
 		}
 		if len(hosts) == 0 {
-			return nil, fmt.Errorf("DOCKPANEL_HOSTS vazio")
+			return nil, fmt.Errorf("DOCKERPILOT_HOSTS (ou DOCKPANEL_HOSTS) vazio")
 		}
 		return NewPool(hosts, hosts[0].ID)
 	}
@@ -54,8 +58,15 @@ func NewPool(hosts []HostConfig, defaultID string) (*Pool, error) {
 		clis:      make(map[string]*Client),
 		defaultID: defaultID,
 	}
-	for _, h := range hosts {
+	for i := range p.hosts {
+		if p.hosts[i].Kind == "" {
+			p.hosts[i].Kind = "auto"
+		}
+		h := p.hosts[i]
 		p.baseline[h.ID] = h
+		if h.Kind == "kubernetes" || h.Kind == "k8s" {
+			continue
+		}
 		cli, err := newWithHost(h.DockerHost)
 		if err != nil {
 			return nil, fmt.Errorf("host %q: %w", h.ID, err)

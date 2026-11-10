@@ -28,17 +28,17 @@ const (
 )
 
 type Diagnosis struct {
-	ContainerID   string   `json:"containerId"`
-	Name          string   `json:"name"`
-	Severity      Severity `json:"severity"`
-	State         string   `json:"state"`
-	ExitCode      int      `json:"exitCode"`
-	OOMKilled     bool     `json:"oomKilled"`
-	RestartCount  int      `json:"restartCount"`
-	StartedAt     string   `json:"startedAt"`
-	FinishedAt    string   `json:"finishedAt"`
-	Findings      []string `json:"findings"`      // frases legíveis do que foi encontrado
-	ErrorLines    []string `json:"errorLines"`     // linhas de log que bateram nos padrões de erro
+	ContainerID     string           `json:"containerId"`
+	Name            string           `json:"name"`
+	Severity        Severity         `json:"severity"`
+	State           string           `json:"state"`
+	ExitCode        int              `json:"exitCode"`
+	OOMKilled       bool             `json:"oomKilled"`
+	RestartCount    int              `json:"restartCount"`
+	StartedAt       string           `json:"startedAt"`
+	FinishedAt      string           `json:"finishedAt"`
+	Findings        []string         `json:"findings"`   // frases legíveis do que foi encontrado
+	ErrorLines      []string         `json:"errorLines"` // linhas de log que bateram nos padrões de erro
 	RecentEvents    []string         `json:"recentEvents"`
 	RelatedFindings []RelatedFinding `json:"relatedFindings"`
 	Recommendation  string           `json:"recommendation"`
@@ -60,16 +60,16 @@ func (e *Engine) Diagnose(ctx context.Context, id string) (*Diagnosis, error) {
 	}
 
 	d := &Diagnosis{
-		ContainerID:  info.ID,
-		Name:         strings.TrimPrefix(info.Name, "/"),
-		State:        info.State.Status,
-		ExitCode:     info.State.ExitCode,
-		OOMKilled:    info.State.OOMKilled,
-		RestartCount: info.RestartCount,
-		StartedAt:    info.State.StartedAt,
-		FinishedAt:   info.State.FinishedAt,
-		Findings:     []string{},
-		ErrorLines:   []string{},
+		ContainerID:     info.ID,
+		Name:            strings.TrimPrefix(info.Name, "/"),
+		State:           info.State.Status,
+		ExitCode:        info.State.ExitCode,
+		OOMKilled:       info.State.OOMKilled,
+		RestartCount:    info.RestartCount,
+		StartedAt:       info.State.StartedAt,
+		FinishedAt:      info.State.FinishedAt,
+		Findings:        []string{},
+		ErrorLines:      []string{},
 		RecentEvents:    []string{},
 		RelatedFindings: []RelatedFinding{},
 	}

@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"dockerpilot/internal/envx"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"dockpanel/internal/deploy"
+	"dockerpilot/internal/deploy"
 )
 
 type Result struct {
@@ -27,7 +28,7 @@ func BackupVolume(ctx context.Context, volumeName, destDir, dockerHost string) (
 		return backupVolumeSSH(ctx, dockerHost, volumeName)
 	}
 	if destDir == "" {
-		if p := strings.TrimSpace(os.Getenv("DOCKPANEL_BACKUP_DIR")); p != "" {
+		if p := strings.TrimSpace(envx.Get("BACKUP_DIR")); p != "" {
 			destDir = p
 		} else {
 			destDir = filepath.Join(os.TempDir(), "dockwatch-backups")
@@ -72,7 +73,7 @@ func BackupVolume(ctx context.Context, volumeName, destDir, dockerHost string) (
 }
 
 func backupVolumeSSH(ctx context.Context, dockerHost, volumeName string) (*Result, error) {
-	destDir := strings.TrimSpace(os.Getenv("DOCKPANEL_BACKUP_DIR"))
+	destDir := strings.TrimSpace(envx.Get("BACKUP_DIR"))
 	if destDir == "" {
 		destDir = "/var/lib/dockwatch/backups"
 	}

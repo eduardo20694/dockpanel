@@ -3,8 +3,8 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"dockerpilot/internal/envx"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -18,7 +18,7 @@ func IsSSHHost(dockerHost string) bool {
 // RemoteComposePath pasta do compose em host SSH (MCP / deploy remoto).
 // Vazio se não configurado — o chamador deve informar project_path.
 func RemoteComposePath() string {
-	return strings.TrimSpace(os.Getenv("DOCKPANEL_COMPOSE_PATH_REMOTE"))
+	return strings.TrimSpace(envx.Get("COMPOSE_PATH_REMOTE"))
 }
 
 // ResolveComposePath escolhe pasta local (drift) ou remota (deploy SSH).

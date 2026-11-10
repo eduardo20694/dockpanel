@@ -1,11 +1,18 @@
 package main
 
 import (
-	"dockpanel/internal/diagnostics"
-	"dockpanel/internal/dockerclient"
+	"dockerpilot/internal/diagnostics"
+	"dockerpilot/internal/dockerclient"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
 
 func hostIDFrom(req mcp.CallToolRequest, pool *dockerclient.Pool) string {
 	return req.GetString("host_id", pool.DefaultID())

@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"dockpanel/internal/auth"
+	"dockerpilot/internal/apikey"
+	"dockerpilot/internal/auth"
 )
 
 type ctxKey int
@@ -18,8 +19,10 @@ func userFromContext(r *http.Request) *auth.User {
 }
 
 func tokenFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(auth.CookieName()); err == nil && c.Value != "" {
-		return c.Value
+	for _, name := range []string{auth.CookieName(), auth.LegacyCookieName()} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" {
+			return c.Value
+		}
 	}
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(h), "bearer ") {
 		return strings.TrimSpace(h[7:])
@@ -47,25 +50,43 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := s.Auth.ParseToken(tokenFromRequest(r))
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = w.Write([]byte(`{"error":"não autenticado"}`))
+		token := tokenFromRequest(r)
+		if claims, err := s.Auth.ParseToken(token); err == nil {
+			u := s.Auth.UserFromClaims(claims)
+			ctx := context.WithValue(r.Context(), userCtxKey, &u)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		u := s.Auth.UserFromClaims(claims)
-		ctx := context.WithValue(r.Context(), userCtxKey, &u)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		if s.Keys != nil {
+			if p, err := s.Keys.Authenticate(token); err == nil {
+				s.Keys.Touch(p.KeyID)
+				u := userFromPrincipal(p)
+				ctx := context.WithValue(r.Context(), userCtxKey, &u)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"não autenticado"}`))
 	})
+}
+
+func userFromPrincipal(p apikey.Principal) auth.User {
+	return auth.User{
+		ID: p.UserID, Email: p.Name, Name: p.Name, Role: p.Role, OrgID: p.OrgID,
+		KeyID: p.KeyID, Stacks: p.Stacks, Hosts: p.Hosts, Guest: p.Guest,
+	}
 }
 
 func isPublicRoute(path string) bool {
 	switch path {
 	case "/api/health", "/api/health/detailed", "/api/openapi.json",
-		"/api/auth/login", "/api/auth/config",
+		"/api/auth/login", "/api/auth/config", "/api/auth/sso", "/api/auth/sso/exchange",
 		"/api/auth/me", "/api/auth/logout",
-		"/api/client-errors":
+		"/api/gitops/webhook",
+		"/api/client-errors",
+		"/metrics":
 		return true
 	default:
 		return false

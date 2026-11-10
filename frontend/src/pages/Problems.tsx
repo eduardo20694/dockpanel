@@ -89,9 +89,12 @@ export default function Problems() {
           <div className="grid lg:grid-cols-2 gap-5">
             <div className="space-y-2">
               {problems.map((p) => (
-                <button
+                <div
                   key={p.containerId}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => openDiagnosis(p.containerId)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') openDiagnosis(p.containerId) }}
                   className={`w-full text-left card-bordered px-5 py-4 transition-all duration-200 focus-ring ${
                     selected === p.containerId
                       ? 'ring-1 ring-accent-border bg-accent-muted shadow-glow-sm'
@@ -103,8 +106,28 @@ export default function Problems() {
                     <SeverityBadge severity={p.severity} />
                   </div>
                   <div className="text-sm text-text-muted">{p.reason}</div>
-                  <div className="text-xs text-text-faint font-mono mt-2 tabular-nums">
-                    {p.state} · exit {p.exitCode} · {p.restartCount} restarts
+                  <div className="flex items-center justify-between gap-3 mt-2">
+                    <div className="text-xs text-text-faint font-mono tabular-nums">
+                      {p.state} · exit {p.exitCode} · {p.restartCount} restarts
+                    </div>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="text-xs text-text-muted hover:text-text"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await api.system.resolveProblem({ containerId: p.containerId, name: p.name, reason: p.reason })
+                        refresh()
+                      }}
+                      onKeyDown={async (e) => {
+                        if (e.key !== 'Enter') return
+                        e.stopPropagation()
+                        await api.system.resolveProblem({ containerId: p.containerId, name: p.name, reason: p.reason })
+                        refresh()
+                      }}
+                    >
+                      Marcar resolvido
+                    </span>
                   </div>
                   <Link
                     to={`/logs?container=${encodeURIComponent(p.name)}`}
@@ -113,7 +136,7 @@ export default function Problems() {
                   >
                     Ver histórico completo no Log Center →
                   </Link>
-                </button>
+                </div>
               ))}
             </div>
 
